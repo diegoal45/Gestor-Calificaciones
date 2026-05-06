@@ -18,11 +18,17 @@ class Reclamo extends Model
         'estado',
     ];
 
+    /**
+     * Nota asociada al reclamo
+     */
     public function nota()
     {
         return $this->belongsTo(Nota::class, 'id_nota');
     }
 
+    /**
+     * Estudiante que realiza el reclamo
+     */
     public function estudiante()
     {
         return $this->belongsTo(Usuario::class, 'id_estudiante');

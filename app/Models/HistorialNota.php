@@ -18,6 +18,9 @@ class HistorialNota extends Model
         'changed_at',
     ];
 
+    /**
+     * Nota asociada al historial
+     */
     public function nota()
     {
         return $this->belongsTo(Nota::class, 'id_nota');

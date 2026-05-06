@@ -17,13 +17,35 @@ class Nota extends Model
         'feedback',
     ];
 
+    /**
+     * Tarea asociada a la nota
+     */
     public function tarea()
     {
         return $this->belongsTo(Tarea::class, 'id_tarea');
     }
 
+    /**
+     * Estudiante dueño de la nota
+     */
     public function estudiante()
     {
         return $this->belongsTo(Usuario::class, 'id_estudiante');
+    }
+
+    /**
+     * Historial de cambios de la nota
+     */
+    public function historialNotas()
+    {
+        return $this->hasMany(HistorialNota::class, 'id_nota');
+    }
+
+    /**
+     * Evaluaciones por rúbrica
+     */
+    public function evaluacionesRubrica()
+    {
+        return $this->hasMany(EvaluacionRubrica::class, 'id_nota');
     }
 }

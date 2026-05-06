@@ -17,16 +17,25 @@ class EvaluacionRubrica extends Model
         'id_nivel',
     ];
 
+    /**
+     * Nota evaluada
+     */
     public function nota()
     {
         return $this->belongsTo(Nota::class, 'id_nota');
     }
 
+    /**
+     * Criterio evaluado
+     */
     public function criterio()
     {
         return $this->belongsTo(Criterio::class, 'id_criterio');
     }
 
+    /**
+     * Nivel del criterio
+     */
     public function nivel()
     {
         return $this->belongsTo(NivelCriterio::class, 'id_nivel');

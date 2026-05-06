@@ -20,8 +20,35 @@ class Curso extends Model
         'peso_asistencia',
     ];
 
+    /**
+     * Profesor responsable del curso
+     */
     public function profesor()
     {
         return $this->belongsTo(Usuario::class, 'id_profesor');
+    }
+
+    /**
+     * Tareas del curso
+     */
+    public function tareas()
+    {
+        return $this->hasMany(Tarea::class, 'id_curso');
+    }
+
+    /**
+     * Inscripciones al curso
+     */
+    public function inscripciones()
+    {
+        return $this->hasMany(Inscripcion::class, 'id_curso');
+    }
+
+    /**
+     * Asistencias del curso
+     */
+    public function asistencias()
+    {
+        return $this->hasMany(Asistencia::class, 'id_curso');
     }
 }

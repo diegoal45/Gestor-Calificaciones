@@ -17,11 +17,17 @@ class Inscripcion extends Model
         'grupo',
     ];
 
+    /**
+     * Curso al que pertenece la inscripción
+     */
     public function curso()
     {
         return $this->belongsTo(Curso::class, 'id_curso');
     }
 
+    /**
+     * Estudiante inscrito
+     */
     public function estudiante()
     {
         return $this->belongsTo(Usuario::class, 'id_estudiante');

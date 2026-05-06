@@ -16,8 +16,19 @@ class Rubrica extends Model
         'nombre',
     ];
 
+    /**
+     * Tarea asociada a la rúbrica
+     */
     public function tarea()
     {
         return $this->belongsTo(Tarea::class, 'id_tarea');
+    }
+
+    /**
+     * Criterios de la rúbrica
+     */
+    public function criterios()
+    {
+        return $this->hasMany(Criterio::class, 'id_rubrica');
     }
 }

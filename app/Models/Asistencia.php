@@ -18,11 +18,17 @@ class Asistencia extends Model
         'estado',
     ];
 
+    /**
+     * Curso al que pertenece la asistencia
+     */
     public function curso()
     {
         return $this->belongsTo(Curso::class, 'id_curso');
     }
 
+    /**
+     * Estudiante asociado a la asistencia
+     */
     public function estudiante()
     {
         return $this->belongsTo(Usuario::class, 'id_estudiante');

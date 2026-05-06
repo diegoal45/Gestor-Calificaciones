@@ -17,8 +17,19 @@ class NivelCriterio extends Model
         'valor',
     ];
 
+    /**
+     * Criterio asociado al nivel
+     */
     public function criterio()
     {
         return $this->belongsTo(Criterio::class, 'id_criterio');
+    }
+
+    /**
+     * Evaluaciones asociadas al nivel
+     */
+    public function evaluacionesRubrica()
+    {
+        return $this->hasMany(EvaluacionRubrica::class, 'id_nivel');
     }
 }

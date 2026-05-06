@@ -20,8 +20,27 @@ class Tarea extends Model
         'fecha_limite',
     ];
 
+    /**
+     * Curso al que pertenece la tarea
+     */
     public function curso()
     {
         return $this->belongsTo(Curso::class, 'id_curso');
+    }
+
+    /**
+     * Notas de la tarea
+     */
+    public function notas()
+    {
+        return $this->hasMany(Nota::class, 'id_tarea');
+    }
+
+    /**
+     * Rúbricas asociadas a la tarea
+     */
+    public function rubricas()
+    {
+        return $this->hasMany(Rubrica::class, 'id_tarea');
     }
 }
