@@ -1,3 +1,80 @@
+# AuthController
+
+### Registro de usuario
+**POST /register**
+```json
+{
+	"nombre": "Juan",
+	"email": "juan@email.com",
+	"password": "secreto123",
+	"rol": "profesor" // o "estudiante"
+}
+```
+**Response:**
+```json
+{
+	"usuario": {
+		"id": 1,
+		"nombre": "Juan",
+		"email": "juan@email.com",
+		"rol": "profesor",
+		...
+	}
+}
+```
+
+### Login de usuario
+**POST /login**
+```json
+{
+	"email": "juan@email.com",
+	"password": "secreto123"
+}
+```
+**Response:**
+```json
+{
+	"usuario": {
+		"id": 1,
+		"nombre": "Juan",
+		"email": "juan@email.com",
+		"rol": "profesor",
+		...
+	}
+}
+```
+
+# CursoController (Códigos de invitación)
+
+### Generar código de invitación
+**POST /cursos/{id}/codigo-invitacion**
+
+**Response:**
+```json
+{
+	"codigo_invitacion": "ABC123XY"
+}
+```
+
+### Unirse a curso por código
+**POST /cursos/unirse**
+```json
+{
+	"codigo_invitacion": "ABC123XY",
+	"id_estudiante": 2
+}
+```
+**Response:**
+```json
+{
+	"inscripcion": {
+		"id": 5,
+		"id_curso": 1,
+		"id_estudiante": 2,
+		...
+	}
+}
+```
 # Ejemplos de Request y Response
 
 ## CursoController

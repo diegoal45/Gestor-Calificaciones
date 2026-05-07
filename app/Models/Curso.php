@@ -18,6 +18,7 @@ class Curso extends Model
         'nota_maxima',
         'usa_asistencia',
         'peso_asistencia',
+        'codigo_invitacion',
     ];
 
     /**

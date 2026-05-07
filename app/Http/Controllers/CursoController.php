@@ -1,3 +1,34 @@
+    // Generar código de invitación para un curso
+    public function generarCodigoInvitacion($id)
+    {
+        $curso = Curso::findOrFail($id);
+        // Generar código aleatorio de 8 caracteres
+        $codigo = substr(str_shuffle('ABCDEFGHJKLMNPQRSTUVWXYZ23456789'), 0, 8);
+        $curso->codigo_invitacion = $codigo;
+        $curso->save();
+        return response()->json(['codigo_invitacion' => $codigo]);
+    }
+
+    // Unirse a un curso usando código de invitación
+    public function unirsePorCodigo(Request $request)
+    {
+        $data = $request->validate([
+            'codigo_invitacion' => 'required|string',
+            'id_estudiante' => 'required|exists:usuarios,id',
+        ]);
+        $curso = Curso::where('codigo_invitacion', $data['codigo_invitacion'])->first();
+        if (!$curso) {
+            return response()->json(['error' => 'Código inválido'], 404);
+        }
+        // Verificar si ya está inscrito
+        if ($curso->inscripciones()->where('id_estudiante', $data['id_estudiante'])->exists()) {
+            return response()->json(['error' => 'Ya inscrito'], 409);
+        }
+        $inscripcion = $curso->inscripciones()->create([
+            'id_estudiante' => $data['id_estudiante'],
+        ]);
+        return response()->json(['inscripcion' => $inscripcion], 201);
+    }
 <?php
 
 namespace App\Http\Controllers;
