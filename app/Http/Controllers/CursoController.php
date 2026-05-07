@@ -1,5 +1,17 @@
+<?php
+namespace App\Http\Controllers;
+use App\Models\Curso;
+use App\Http\Requests\CursoRequest;
+use Illuminate\Http\Request;
+
+class CursoController extends Controller
+{
     // Generar código de invitación para un curso
-    public function generarCodigoInvitacion($id)
+    /**
+     * Genera un código de invitación para un curso.
+     * @param int $id
+     */
+    public function generarCodigoInvitacion(int $id)
     {
         $curso = Curso::findOrFail($id);
         // Generar código aleatorio de 8 caracteres
@@ -29,16 +41,6 @@
         ]);
         return response()->json(['inscripcion' => $inscripcion], 201);
     }
-<?php
-
-namespace App\Http\Controllers;
-
-use App\Models\Curso;
-use App\Http\Requests\CursoRequest;
-use Illuminate\Http\Request;
-
-class CursoController extends Controller
-{
 
     // Listar todos los cursos con profesor y tareas
     public function index()
@@ -49,7 +51,11 @@ class CursoController extends Controller
 
 
     // Mostrar un curso específico con detalles y resumen de rendimiento
-    public function show($id)
+    /**
+     * Muestra un curso específico con detalles y resumen de rendimiento.
+     * @param int $id
+     */
+    public function show(int $id)
     {
         $curso = Curso::with([
             'profesor',
@@ -97,7 +103,12 @@ class CursoController extends Controller
 
 
     // Actualizar un curso existente (incluyendo configuración de asistencia)
-    public function update(CursoRequest $request, $id)
+    /**
+     * Actualiza un curso existente.
+     * @param CursoRequest $request
+     * @param int $id
+     */
+    public function update(CursoRequest $request, int $id)
     {
         $curso = Curso::findOrFail($id);
         $data = $request->validated();
@@ -114,7 +125,11 @@ class CursoController extends Controller
 
 
     // Eliminar un curso
-    public function destroy($id)
+    /**
+     * Elimina un curso.
+     * @param int $id
+     */
+    public function destroy(int $id)
     {
         $curso = Curso::findOrFail($id);
         $curso->delete();
@@ -122,7 +137,11 @@ class CursoController extends Controller
     }
 
     // Exportar datos del curso (ejemplo: inscripciones y notas)
-    public function export($id)
+    /**
+     * Exporta datos del curso.
+     * @param int $id
+     */
+    public function export(int $id)
     {
         $curso = Curso::with(['inscripciones.estudiante', 'tareas.notas'])->findOrFail($id);
         // Aquí puedes implementar la lógica de exportación (CSV, Excel, etc.)

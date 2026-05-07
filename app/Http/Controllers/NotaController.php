@@ -11,21 +11,34 @@ use Illuminate\Http\Request;
 class NotaController extends Controller
 {
     // Listar notas de una tarea
-    public function index($tareaId)
+    /**
+     * Lista notas de una tarea.
+     * @param int $tareaId
+     */
+    public function index(int $tareaId)
     {
         $notas = Nota::with('estudiante')->where('id_tarea', $tareaId)->get();
         return response()->json($notas);
     }
 
     // Mostrar una nota específica con feedback e historial
-    public function show($id)
+    /**
+     * Muestra una nota específica.
+     * @param int $id
+     */
+    public function show(int $id)
     {
         $nota = Nota::with(['estudiante', 'historialNotas', 'evaluacionesRubrica'])->findOrFail($id);
         return response()->json($nota);
     }
 
     // Registrar una nueva nota
-    public function store(NotaRequest $request, $tareaId)
+    /**
+     * Registra una nueva nota.
+     * @param NotaRequest $request
+     * @param int $tareaId
+     */
+    public function store(NotaRequest $request, int $tareaId)
     {
         $data = $request->validated();
         $data['id_tarea'] = $tareaId;
@@ -34,7 +47,12 @@ class NotaController extends Controller
     }
 
     // Actualizar una nota existente
-    public function update(NotaRequest $request, $id)
+    /**
+     * Actualiza una nota existente.
+     * @param NotaRequest $request
+     * @param int $id
+     */
+    public function update(NotaRequest $request, int $id)
     {
         $nota = Nota::findOrFail($id);
         $nota->update($request->validated());
@@ -42,7 +60,11 @@ class NotaController extends Controller
     }
 
     // Eliminar una nota
-    public function destroy($id)
+    /**
+     * Elimina una nota.
+     * @param int $id
+     */
+    public function destroy(int $id)
     {
         $nota = Nota::findOrFail($id);
         $nota->delete();
@@ -50,7 +72,12 @@ class NotaController extends Controller
     }
 
     // Registrar feedback para una nota
-    public function feedback(Request $request, $id)
+    /**
+     * Registra feedback para una nota.
+     * @param Request $request
+     * @param int $id
+     */
+    public function feedback(Request $request, int $id)
     {
         $nota = Nota::findOrFail($id);
         $request->validate(['feedback' => 'required|string']);
@@ -60,7 +87,12 @@ class NotaController extends Controller
     }
 
     // Calcular promedio y nota final de un estudiante en un curso
-    public function promedio($cursoId, $estudianteId)
+    /**
+     * Calcula promedio y nota final de un estudiante en un curso.
+     * @param int $cursoId
+     * @param int $estudianteId
+     */
+    public function promedio(int $cursoId, int $estudianteId)
     {
         $tareas = Tarea::where('id_curso', $cursoId)->get();
         $notas = Nota::whereIn('id_tarea', $tareas->pluck('id'))
@@ -71,7 +103,13 @@ class NotaController extends Controller
     }
 
     // Simulador de notas: calcula nota final con posibles valores
-    public function simular(Request $request, $cursoId, $estudianteId)
+    /**
+     * Simulador de notas.
+     * @param Request $request
+     * @param int $cursoId
+     * @param int $estudianteId
+     */
+    public function simular(Request $request, int $cursoId, int $estudianteId)
     {
         $request->validate([
             'notas_simuladas' => 'required|array',
@@ -87,7 +125,11 @@ class NotaController extends Controller
     }
 
     // Exportar notas de una tarea
-    public function export($tareaId)
+    /**
+     * Exporta notas de una tarea.
+     * @param int $tareaId
+     */
+    public function export(int $tareaId)
     {
         $notas = Nota::with('estudiante')->where('id_tarea', $tareaId)->get();
         // Aquí puedes implementar exportación a CSV/Excel
