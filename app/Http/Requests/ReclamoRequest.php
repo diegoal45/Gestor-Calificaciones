@@ -14,10 +14,8 @@ class ReclamoRequest extends FormRequest
     public function rules()
     {
         return [
-            'nota_id' => 'required|exists:notas,id',
-            'motivo' => 'required|string',
-            'estado' => 'nullable|in:pendiente,respondido,cerrado',
-            'respuesta' => 'nullable|string',
+            'id_estudiante' => 'required|exists:usuarios,id',
+            'mensaje' => 'required|string',
         ];
     }
 }

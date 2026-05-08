@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\Nota;
 use App\Models\Tarea;
 use App\Models\Curso;
+use App\Models\EvaluacionRubrica;
 use App\Http\Requests\NotaRequest;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class NotaController extends Controller
 {
@@ -135,5 +137,121 @@ class NotaController extends Controller
         // Aquí puedes implementar exportación a CSV/Excel
         // Por ahora, solo retorna los datos en JSON
         return response()->json($notas);
+    }
+
+    public function contextoCalificacion(int $tareaId)
+    {
+        $tarea = Tarea::with(['curso.inscripciones.estudiante', 'rubricas.criterios.niveles'])->findOrFail($tareaId);
+
+        $estudiantes = $tarea->curso->inscripciones->map(function ($inscripcion) {
+            return [
+                'id' => $inscripcion->estudiante->id,
+                'nombre' => $inscripcion->estudiante->nombre,
+                'email' => $inscripcion->estudiante->email,
+            ];
+        })->values();
+
+        $notas = Nota::with(['evaluacionesRubrica'])
+            ->where('id_tarea', $tareaId)
+            ->get()
+            ->keyBy('id_estudiante');
+
+        return response()->json([
+            'tarea' => $tarea,
+            'estudiantes' => $estudiantes,
+            'notas' => $notas,
+        ]);
+    }
+
+    public function calificar(Request $request, int $tareaId, int $estudianteId)
+    {
+        $tarea = Tarea::with('rubricas.criterios.niveles')->findOrFail($tareaId);
+
+        $rules = [
+            'feedback' => 'required|string|min:3',
+            'nota' => 'nullable|numeric|min:0|max:5',
+            'rubrica_id' => 'nullable|exists:rubricas,id',
+            'evaluaciones' => 'nullable|array',
+            'evaluaciones.*.id_criterio' => 'required_with:evaluaciones|exists:criterios,id',
+            'evaluaciones.*.id_nivel' => 'required_with:evaluaciones|exists:niveles_criterio,id',
+            'evaluaciones.*.porcentaje' => 'required_with:evaluaciones|numeric|min:0|max:100',
+        ];
+        $data = $request->validate($rules);
+
+        $notaValor = $data['nota'] ?? null;
+        $evaluacionesPayload = collect($data['evaluaciones'] ?? []);
+
+        if ($tarea->tipo === 'rubrica') {
+            if (empty($data['rubrica_id'])) {
+                return response()->json(['message' => 'Debes seleccionar una rúbrica para calificar esta tarea.'], 422);
+            }
+
+            $rubrica = $tarea->rubricas->firstWhere('id', (int) $data['rubrica_id']);
+            if (!$rubrica) {
+                return response()->json(['message' => 'La rúbrica seleccionada no pertenece a la tarea.'], 422);
+            }
+
+            $criterios = $rubrica->criterios;
+            if ($evaluacionesPayload->count() !== $criterios->count()) {
+                return response()->json(['message' => 'Debes evaluar todos los criterios de la rúbrica.'], 422);
+            }
+
+            $pesoTotal = (float) $criterios->sum('peso');
+            if ($pesoTotal <= 0) {
+                return response()->json(['message' => 'La rúbrica no tiene pesos válidos.'], 422);
+            }
+
+            $criteriosPorId = $criterios->keyBy('id');
+            // El % logrado por criterio se define al calificar (no viene fijo en la rúbrica)
+            $sumaPonderadaPct = 0;
+            foreach ($evaluacionesPayload as $evaluacion) {
+                $criterioId = (int) $evaluacion['id_criterio'];
+                $nivelId = (int) $evaluacion['id_nivel'];
+                $logroPct = (float) $evaluacion['porcentaje']; // 0..100
+                $criterio = $criteriosPorId->get($criterioId);
+                if (!$criterio) {
+                    return response()->json(['message' => 'Hay criterios inválidos en la evaluación.'], 422);
+                }
+
+                $nivel = $criterio->niveles->firstWhere('id', $nivelId);
+                if (!$nivel) {
+                    return response()->json(['message' => 'Hay niveles inválidos para el criterio seleccionado.'], 422);
+                }
+
+                $sumaPonderadaPct += $logroPct * ((float) $criterio->peso / 100);
+            }
+
+            $pctFinal = $sumaPonderadaPct / ($pesoTotal / 100); // 0..100
+            // Nota final en escala 0..5 (compatibilidad con frontend)
+            $notaValor = round(($pctFinal / 100) * 5, 2);
+        }
+
+        if ($notaValor === null) {
+            return response()->json(['message' => 'Debes ingresar una nota válida para calificación manual.'], 422);
+        }
+
+        $nota = DB::transaction(function () use ($tareaId, $estudianteId, $data, $notaValor, $evaluacionesPayload) {
+            $nota = Nota::updateOrCreate(
+                ['id_tarea' => $tareaId, 'id_estudiante' => $estudianteId],
+                ['nota' => $notaValor, 'feedback' => $data['feedback']]
+            );
+
+            EvaluacionRubrica::where('id_nota', $nota->id)->delete();
+            foreach ($evaluacionesPayload as $evaluacion) {
+                EvaluacionRubrica::create([
+                    'id_nota' => $nota->id,
+                    'id_criterio' => $evaluacion['id_criterio'],
+                    'id_nivel' => $evaluacion['id_nivel'],
+                    'porcentaje' => $evaluacion['porcentaje'] ?? null,
+                ]);
+            }
+
+            return $nota->fresh(['evaluacionesRubrica.criterio', 'evaluacionesRubrica.nivel']);
+        });
+
+        return response()->json([
+            'message' => 'Calificación guardada',
+            'nota' => $nota,
+        ]);
     }
 }

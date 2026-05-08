@@ -15,6 +15,7 @@ class NivelCriterio extends Model
         'id_criterio',
         'nombre',
         'valor',
+        'descripcion',
     ];
 
     /**

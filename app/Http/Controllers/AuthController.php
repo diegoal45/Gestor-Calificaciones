@@ -6,6 +6,7 @@ use App\Models\Usuario;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 class AuthController extends Controller
 {
@@ -20,7 +21,8 @@ class AuthController extends Controller
         ]);
         $data['password'] = Hash::make($data['password']);
         $usuario = Usuario::create($data);
-        return response()->json(['usuario' => $usuario], 201);
+        $token = $usuario->createToken('auth_token')->plainTextToken;
+        return response()->json(['usuario' => $usuario, 'token' => $token], 201);
     }
 
     // Login de usuario
@@ -34,7 +36,45 @@ class AuthController extends Controller
         if (!$usuario || !Hash::check($credentials['password'], $usuario->password)) {
             return response()->json(['error' => 'Credenciales inválidas'], 401);
         }
-        // Aquí podrías generar un token si usas Sanctum/JWT
-        return response()->json(['usuario' => $usuario]);
+        $token = $usuario->createToken('auth_token')->plainTextToken;
+        return response()->json(['usuario' => $usuario, 'token' => $token]);
+    }
+
+    // Logout de usuario
+    public function logout(Request $request)
+    {
+        $request->user()->currentAccessToken()->delete();
+        return response()->json(['message' => 'Cierre de sesión exitoso']);
+    }
+
+    public function me(Request $request)
+    {
+        return response()->json($request->user());
+    }
+
+    public function updateProfile(Request $request)
+    {
+        $user = $request->user();
+        $data = $request->validate([
+            'nombre' => 'required|string|max:255',
+            'email' => ['required', 'email', Rule::unique('usuarios', 'email')->ignore($user->id)],
+        ]);
+        $user->update($data);
+        return response()->json(['usuario' => $user]);
+    }
+
+    public function updatePassword(Request $request)
+    {
+        $data = $request->validate([
+            'password_actual' => 'required|string',
+            'password_nueva' => 'required|string|min:6',
+        ]);
+        $user = $request->user();
+        if (!Hash::check($data['password_actual'], $user->password)) {
+            return response()->json(['message' => 'La contraseña actual no coincide'], 422);
+        }
+        $user->password = Hash::make($data['password_nueva']);
+        $user->save();
+        return response()->json(['message' => 'Contraseña actualizada']);
     }
 }

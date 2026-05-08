@@ -1,0 +1,304 @@
+<template>
+  <div>
+    <div class="d-flex justify-content-between align-items-center mb-5 mt-2">
+      <div>
+        <h2 class="fw-bold m-0 text-dark">Hola, {{ userName }} <span class="wave-emoji">👋</span></h2>
+        <p class="text-muted mt-1 fs-5">Tus cursos inscritos</p>
+      </div>
+      <div class="d-flex gap-2">
+        <button class="btn btn-primary-custom fw-bold px-4 py-2" @click="showJoinModal = true">Unirme a curso</button>
+        <button class="btn btn-light border fw-medium px-4 py-2 action-btn" @click="router.push('/estudiante/perfil')">Perfil</button>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm rounded-4 p-3 mb-4">
+      <div class="row g-2 align-items-center">
+        <div class="col-md-8">
+          <input
+            v-model="searchQuery"
+            @keyup.enter="applyFilter"
+            type="text"
+            class="form-control custom-input"
+            placeholder="Filtrar tus cursos..."
+          />
+        </div>
+        <div class="col-md-4 d-flex gap-2 justify-content-md-end">
+          <button class="btn btn-light border fw-medium action-btn" @click="clearFilter" :disabled="!searchQuery">Limpiar</button>
+          <button class="btn btn-primary-custom fw-bold" @click="applyFilter">Filtrar</button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="error" class="alert alert-danger">{{ error }}</div>
+
+    <div v-if="loading" class="row g-4">
+      <div class="col-md-4" v-for="i in 3" :key="i">
+        <div class="card border-0 rounded-4 shadow-sm p-4 h-100 placeholder-glow">
+          <div class="placeholder col-8 mb-3 py-3 rounded"></div>
+          <div class="placeholder col-5 mb-2"></div>
+          <div class="placeholder col-6"></div>
+        </div>
+      </div>
+    </div>
+
+    <div v-else-if="cursos.length === 0" class="text-center py-5">
+      <div class="opacity-50 mb-3">
+        <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+      </div>
+      <h4 class="text-muted fw-bold">Aun no tienes cursos</h4>
+      <p class="text-muted">Usa un codigo de invitacion para unirte a tu primer curso.</p>
+    </div>
+
+    <div v-else class="row g-4">
+      <div class="col-12 col-md-6 col-xl-4" v-for="(curso, index) in cursos" :key="curso.id">
+        <div class="card border-0 shadow-sm h-100 overflow-hidden course-card">
+          <div class="course-banner text-white p-4 position-relative" :class="`banner-color-${index % 4}`">
+            <h4 class="fw-bold mb-1 position-relative z-1 text-truncate">{{ curso.nombre }}</h4>
+            <p class="opacity-75 m-0 position-relative z-1 text-truncate">{{ curso.descripcion || 'Sin descripcion' }}</p>
+            <div class="abstract-pattern"></div>
+          </div>
+          <div class="card-body p-4">
+            <div class="d-flex justify-content-between mb-2">
+              <span class="text-muted fw-medium">Promedio</span>
+              <strong>{{ curso.promedio_general ?? 'N/A' }}</strong>
+            </div>
+            <div class="d-flex justify-content-between mb-3">
+              <span class="text-muted fw-medium">Estado</span>
+              <span class="badge" :class="getEstadoClass(curso.promedio_general)"> {{ getEstado(curso.promedio_general) }} </span>
+            </div>
+            <button class="btn btn-light border w-100 fw-medium action-btn" @click="abrirCurso(curso.id)">Abrir curso</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div v-if="!loading && cursos.length > 0" class="d-flex justify-content-between align-items-center mt-4">
+      <small class="text-muted">Mostrando {{ cursos.length }} de {{ totalCursos }} cursos</small>
+      <div class="d-flex align-items-center gap-2">
+        <button class="btn btn-sm btn-light border action-btn" @click="goToPage(currentPage - 1)" :disabled="currentPage <= 1">Anterior</button>
+        <span class="small text-muted">Pagina {{ currentPage }} de {{ lastPage }}</span>
+        <button class="btn btn-sm btn-light border action-btn" @click="goToPage(currentPage + 1)" :disabled="currentPage >= lastPage">Siguiente</button>
+      </div>
+    </div>
+
+    <div v-if="showJoinModal" class="modal-overlay d-flex align-items-center justify-content-center">
+      <div class="card border-0 shadow-lg rounded-4 p-4 modal-card">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="fw-bold m-0">Unirme a un curso</h5>
+          <button class="btn-close" @click="closeJoinModal"></button>
+        </div>
+        <p class="text-muted small">Ingresa el codigo de invitacion que te compartio el profesor.</p>
+        <input
+          v-model.trim="codigoInvitacion"
+          type="text"
+          class="form-control custom-input mb-3"
+          placeholder="Ej: AB12CD34"
+          maxlength="20"
+        />
+        <div class="d-flex justify-content-end gap-2">
+          <button class="btn btn-light border action-btn" @click="closeJoinModal">Cancelar</button>
+          <button class="btn btn-primary-custom" @click="unirmeCurso" :disabled="joining || !codigoInvitacion">
+            <span v-if="joining" class="spinner-border spinner-border-sm me-2"></span>
+            Unirme
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { apiRequest } from '../../api.js'
+
+const router = useRouter()
+const userName = ref('Estudiante')
+const loading = ref(true)
+const error = ref('')
+const cursos = ref([])
+const searchQuery = ref('')
+const currentPage = ref(1)
+const lastPage = ref(1)
+const totalCursos = ref(0)
+const showJoinModal = ref(false)
+const codigoInvitacion = ref('')
+const joining = ref(false)
+
+onMounted(async () => {
+  try {
+    const user = JSON.parse(localStorage.getItem('user'))
+    if (user?.nombre) userName.value = user.nombre
+  } catch (_) {}
+
+  await loadCursos()
+})
+
+async function loadCursos(page = 1) {
+  loading.value = true
+  error.value = ''
+  try {
+    const params = new URLSearchParams({
+      page: String(page),
+      per_page: '6',
+    })
+    if (searchQuery.value.trim()) {
+      params.set('q', searchQuery.value.trim())
+    }
+    const res = await apiRequest(`/api/cursos?${params.toString()}`)
+    cursos.value = res.data || []
+    currentPage.value = res.meta?.current_page || 1
+    lastPage.value = res.meta?.last_page || 1
+    totalCursos.value = res.meta?.total || cursos.value.length
+  } catch (e) {
+    error.value = 'No se pudieron cargar tus cursos: ' + e.message
+  } finally {
+    loading.value = false
+  }
+}
+
+function abrirCurso(id) {
+  router.push(`/estudiante/curso/${id}`)
+}
+
+function applyFilter() {
+  loadCursos(1)
+}
+
+function clearFilter() {
+  searchQuery.value = ''
+  loadCursos(1)
+}
+
+function goToPage(page) {
+  if (page < 1 || page > lastPage.value) return
+  loadCursos(page)
+}
+
+function closeJoinModal() {
+  showJoinModal.value = false
+  codigoInvitacion.value = ''
+}
+
+async function unirmeCurso() {
+  joining.value = true
+  error.value = ''
+  try {
+    const user = JSON.parse(localStorage.getItem('user') || 'null')
+    if (!user?.id) throw new Error('Sesion invalida. Inicia sesion de nuevo.')
+    await apiRequest('/api/cursos/unirse', 'POST', {
+      codigo_invitacion: codigoInvitacion.value,
+      id_estudiante: user.id,
+    })
+    closeJoinModal()
+    await loadCursos(1)
+  } catch (e) {
+    error.value = 'No fue posible unirte al curso: ' + e.message
+  } finally {
+    joining.value = false
+  }
+}
+
+function getEstado(promedio) {
+  const val = parseFloat(promedio)
+  if (isNaN(val)) return 'Sin notas'
+  if (val >= 4.0) return 'Aprobando'
+  if (val >= 3.0) return 'En riesgo'
+  return 'Critico'
+}
+
+function getEstadoClass(promedio) {
+  const val = parseFloat(promedio)
+  if (isNaN(val)) return 'bg-light text-muted border'
+  if (val >= 4.0) return 'bg-success text-white'
+  if (val >= 3.0) return 'bg-warning text-dark'
+  return 'bg-danger text-white'
+}
+</script>
+
+<style scoped>
+.wave-emoji {
+  display: inline-block;
+  animation: wave-animation 2.5s infinite;
+  transform-origin: 70% 70%;
+}
+@keyframes wave-animation {
+  0% { transform: rotate( 0.0deg) }
+  10% { transform: rotate(14.0deg) }
+  20% { transform: rotate(-8.0deg) }
+  30% { transform: rotate(14.0deg) }
+  40% { transform: rotate(-4.0deg) }
+  50% { transform: rotate(10.0deg) }
+  60% { transform: rotate( 0.0deg) }
+  100% { transform: rotate( 0.0deg) }
+}
+
+.course-card {
+  border-radius: 16px;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+.course-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1) !important;
+}
+.course-banner {
+  min-height: 120px;
+  overflow: hidden;
+}
+.banner-color-0 { background: linear-gradient(135deg, #2563eb, #1e40af); }
+.banner-color-1 { background: linear-gradient(135deg, #059669, #047857); }
+.banner-color-2 { background: linear-gradient(135deg, #9333ea, #7e22ce); }
+.banner-color-3 { background: linear-gradient(135deg, #e11d48, #be123c); }
+.abstract-pattern {
+  position: absolute;
+  top: 0;
+  right: -20%;
+  width: 150px;
+  height: 150px;
+  background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0) 70%);
+  border-radius: 50%;
+  transform: translateY(-20%);
+  z-index: 0;
+}
+.custom-input {
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+.custom-input:focus {
+  background-color: #ffffff;
+  border-color: #1e40af;
+  box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.1);
+}
+.btn-primary-custom {
+  background: #1e40af;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  transition: all 0.3s ease;
+}
+.btn-primary-custom:hover:not(:disabled) {
+  background: #1e3a8a;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 15px rgba(30, 64, 175, 0.2);
+  color: white;
+}
+.action-btn {
+  border-radius: 10px;
+  transition: all 0.2s ease;
+}
+.action-btn:hover {
+  background-color: #f1f5f9;
+  border-color: #cbd5e1 !important;
+}
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(2px);
+  z-index: 1050;
+}
+.modal-card {
+  width: 100%;
+  max-width: 460px;
+}
+</style>

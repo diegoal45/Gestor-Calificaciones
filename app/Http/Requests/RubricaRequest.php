@@ -14,8 +14,7 @@ class RubricaRequest extends FormRequest
     public function rules()
     {
         return [
-            'nombre' => 'required|string|max:255',
-            'tarea_id' => 'required|exists:tareas,id',
+            'nombre' => 'nullable|string|max:255',
         ];
     }
 }

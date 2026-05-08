@@ -15,6 +15,7 @@ class EvaluacionRubrica extends Model
         'id_nota',
         'id_criterio',
         'id_nivel',
+        'porcentaje',
     ];
 
     /**

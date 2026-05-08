@@ -15,7 +15,6 @@ class CriterioRequest extends FormRequest
     {
         return [
             'nombre' => 'required|string|max:255',
-            'rubrica_id' => 'required|exists:rubricas,id',
             'peso' => 'required|numeric|min:0|max:100',
         ];
     }

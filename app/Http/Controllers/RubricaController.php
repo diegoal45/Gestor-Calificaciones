@@ -30,6 +30,10 @@ class RubricaController extends Controller
     {
         $data = $request->validated();
         $data['id_tarea'] = $tareaId;
+        if (empty($data['nombre'])) {
+            $tarea = Tarea::findOrFail($tareaId);
+            $data['nombre'] = 'Rúbrica - ' . $tarea->nombre;
+        }
         $rubrica = Rubrica::create($data);
         return response()->json($rubrica, 201);
     }

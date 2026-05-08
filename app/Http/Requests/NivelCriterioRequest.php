@@ -14,9 +14,9 @@ class NivelCriterioRequest extends FormRequest
     public function rules()
     {
         return [
-            'criterio_id' => 'required|exists:criterios,id',
             'nombre' => 'required|string|max:255',
-            'valor' => 'required|numeric|min:0',
+            'valor' => 'nullable|numeric|min:0|max:100',
+            'descripcion' => 'nullable|string',
         ];
     }
 }

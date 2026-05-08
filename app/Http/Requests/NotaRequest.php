@@ -14,9 +14,8 @@ class NotaRequest extends FormRequest
     public function rules()
     {
         return [
-            'valor' => 'required|numeric|min:0',
-            'tarea_id' => 'required|exists:tareas,id',
-            'inscripcion_id' => 'required|exists:inscripciones,id',
+            'nota' => 'required|numeric|min:0|max:5',
+            'id_estudiante' => 'required|exists:usuarios,id',
             'feedback' => 'nullable|string',
         ];
     }

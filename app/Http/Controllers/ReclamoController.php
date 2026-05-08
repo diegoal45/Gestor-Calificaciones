@@ -10,11 +10,25 @@ use Illuminate\Http\Request;
 
 class ReclamoController extends Controller
 {
+    // Listar reclamos de un curso (vista profesor/admin)
+    public function indexCurso($cursoId)
+    {
+        $reclamos = Reclamo::with(['estudiante', 'nota.tarea'])
+            ->whereHas('nota.tarea', function ($q) use ($cursoId) {
+                $q->where('id_curso', $cursoId);
+            })
+            ->latest()
+            ->get();
+
+        return response()->json($reclamos);
+    }
+
     // Listar reclamos de un estudiante
     public function indexEstudiante($estudianteId)
     {
-        $reclamos = Reclamo::with('nota')
+        $reclamos = Reclamo::with(['nota.tarea'])
             ->where('id_estudiante', $estudianteId)
+            ->latest()
             ->get();
         return response()->json($reclamos);
     }
@@ -22,8 +36,9 @@ class ReclamoController extends Controller
     // Listar reclamos de una nota
     public function indexNota($notaId)
     {
-        $reclamos = Reclamo::with('estudiante')
+        $reclamos = Reclamo::with(['estudiante', 'nota.tarea'])
             ->where('id_nota', $notaId)
+            ->latest()
             ->get();
         return response()->json($reclamos);
     }

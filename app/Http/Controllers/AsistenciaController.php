@@ -10,12 +10,16 @@ use Illuminate\Http\Request;
 
 class AsistenciaController extends Controller
 {
-    // Listar asistencias de un curso
-    public function index($cursoId)
+    // Listar asistencias de un curso (opcionalmente por fecha)
+    public function index(Request $request, $cursoId)
     {
-        $asistencias = Asistencia::with('estudiante')
-            ->where('id_curso', $cursoId)
-            ->get();
+        $query = Asistencia::with('estudiante')->where('id_curso', $cursoId);
+
+        if ($request->has('fecha')) {
+            $query->whereDate('fecha', $request->fecha);
+        }
+
+        $asistencias = $query->get();
         return response()->json($asistencias);
     }
 
@@ -28,13 +32,35 @@ class AsistenciaController extends Controller
         return response()->json($asistencias);
     }
 
-    // Registrar una nueva asistencia
-    public function store(AsistenciaRequest $request, $cursoId)
+    // Registrar asistencias en lote para una fecha
+    public function store(Request $request, $cursoId)
     {
-        $data = $request->validated();
-        $data['id_curso'] = $cursoId;
-        $asistencia = Asistencia::create($data);
-        return response()->json($asistencia, 201);
+        $request->validate([
+            'fecha' => 'required|date',
+            'asistencias' => 'required|array',
+            'asistencias.*.id_estudiante' => 'required|exists:usuarios,id',
+            'asistencias.*.estado' => 'required|in:P,F,E',
+        ]);
+
+        $fecha = $request->fecha;
+
+        foreach ($request->asistencias as $asistenciaData) {
+            // Mapear P a presente, F y E a ausente
+            $estadoDB = $asistenciaData['estado'] === 'P' ? 'presente' : 'ausente';
+
+            Asistencia::updateOrCreate(
+                [
+                    'id_curso' => $cursoId,
+                    'id_estudiante' => $asistenciaData['id_estudiante'],
+                    'fecha' => $fecha
+                ],
+                [
+                    'estado' => $estadoDB
+                ]
+            );
+        }
+
+        return response()->json(['message' => 'Asistencia guardada correctamente'], 201);
     }
 
     // Actualizar una asistencia existente

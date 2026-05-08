@@ -28,6 +28,9 @@ class NivelCriterioController extends Controller
     {
         $data = $request->validated();
         $data['id_criterio'] = $criterioId;
+        if (!array_key_exists('valor', $data) || $data['valor'] === null) {
+            $data['valor'] = 0;
+        }
         $nivel = NivelCriterio::create($data);
         return response()->json($nivel, 201);
     }
@@ -36,7 +39,11 @@ class NivelCriterioController extends Controller
     public function update(NivelCriterioRequest $request, $id)
     {
         $nivel = NivelCriterio::findOrFail($id);
-        $nivel->update($request->validated());
+        $data = $request->validated();
+        if (!array_key_exists('valor', $data) || $data['valor'] === null) {
+            $data['valor'] = 0;
+        }
+        $nivel->update($data);
         return response()->json($nivel);
     }
 
