@@ -174,7 +174,7 @@ class NotaController extends Controller
             'evaluaciones' => 'nullable|array',
             'evaluaciones.*.id_criterio' => 'required_with:evaluaciones|exists:criterios,id',
             'evaluaciones.*.id_nivel' => 'required_with:evaluaciones|exists:niveles_criterio,id',
-            'evaluaciones.*.porcentaje' => 'nullable|numeric|min:10|max:70',
+            'evaluaciones.*.porcentaje' => 'nullable|numeric|min:0|max:100',
         ];
         $data = $request->validate($rules);
 
@@ -182,23 +182,23 @@ class NotaController extends Controller
         $evaluacionesPayload = collect($data['evaluaciones'] ?? []);
 
         if ($tarea->tipo === 'rubrica') {
-            if (empty($data['rubrica_id'])) {
-                return response()->json(['message' => 'Debes seleccionar una rúbrica para calificar esta tarea.'], 422);
+            // Todos los criterios de todas las rúbricas de la tarea (una sola calificación cubre la tarea completa)
+            $criterios = $tarea->rubricas->flatMap(fn ($r) => $r->criterios)->unique('id')->values();
+            if ($criterios->isEmpty()) {
+                return response()->json(['message' => 'Esta tarea no tiene criterios de rúbrica configurados.'], 422);
             }
 
-            $rubrica = $tarea->rubricas->firstWhere('id', (int) $data['rubrica_id']);
-            if (!$rubrica) {
-                return response()->json(['message' => 'La rúbrica seleccionada no pertenece a la tarea.'], 422);
+            if ($evaluacionesPayload->pluck('id_criterio')->unique()->count() !== $evaluacionesPayload->count()) {
+                return response()->json(['message' => 'Hay criterios repetidos en la evaluación enviada.'], 422);
             }
 
-            $criterios = $rubrica->criterios;
             if ($evaluacionesPayload->count() !== $criterios->count()) {
-                return response()->json(['message' => 'Debes evaluar todos los criterios de la rúbrica.'], 422);
+                return response()->json(['message' => 'Debes elegir un nivel en cada criterio de todas las rúbricas de esta tarea.'], 422);
             }
 
             $pesoTotal = (float) $criterios->sum('peso');
             if ($pesoTotal <= 0) {
-                return response()->json(['message' => 'La rúbrica no tiene pesos válidos.'], 422);
+                return response()->json(['message' => 'Los criterios no tienen pesos válidos (suma debe ser mayor que 0).'], 422);
             }
 
             $criteriosPorId = $criterios->keyBy('id');
@@ -208,7 +208,7 @@ class NotaController extends Controller
                 $nivelId = (int) $evaluacion['id_nivel'];
                 $criterio = $criteriosPorId->get($criterioId);
                 if (!$criterio) {
-                    throw new \InvalidArgumentException('Hay criterios inválidos en la evaluación.');
+                    throw new \InvalidArgumentException('Hay criterios que no pertenecen a esta tarea.');
                 }
 
                 $nivel = $criterio->niveles->firstWhere('id', $nivelId);
@@ -216,22 +216,22 @@ class NotaController extends Controller
                     throw new \InvalidArgumentException('Hay niveles inválidos para el criterio seleccionado.');
                 }
 
+                // % de logro del criterio según el nivel (0–100); ej. 60 => 60% del peso de ese criterio en la nota
                 $porcentaje = array_key_exists('porcentaje', $evaluacion) && $evaluacion['porcentaje'] !== null
                     ? (float) $evaluacion['porcentaje']
                     : (float) $nivel->valor;
-                $porcentaje = max(10, min(70, $porcentaje));
+                $porcentaje = max(0, min(100, $porcentaje));
                 $evaluacion['porcentaje'] = $porcentaje;
                 return $evaluacion;
             });
 
             foreach ($evaluacionesPayload as $evaluacion) {
                 $criterio = $criteriosPorId->get((int) $evaluacion['id_criterio']);
-                $logroPct = (float) $evaluacion['porcentaje']; // 10..70
+                $logroPct = (float) $evaluacion['porcentaje'];
                 $sumaPonderadaPct += $logroPct * ((float) $criterio->peso / 100);
             }
 
-            $pctFinal = $sumaPonderadaPct / ($pesoTotal / 100); // 0..100
-            // Nota final en escala 0..5 (compatibilidad con frontend)
+            $pctFinal = $sumaPonderadaPct / ($pesoTotal / 100);
             $notaValor = round(($pctFinal / 100) * 5, 2);
         }
 

@@ -33,6 +33,16 @@ export async function apiRequest(endpoint, method = 'GET', data = null) {
     throw new Error('No autorizado')
   }
   
-  if (!res.ok) throw new Error(await res.text())
+  if (!res.ok) {
+    const raw = await res.text()
+    try {
+      const json = JSON.parse(raw)
+      const msg = json.message || json.error || (Array.isArray(json.errors) ? JSON.stringify(json.errors) : null)
+      throw new Error(msg || raw || `Error HTTP ${res.status}`)
+    } catch (e) {
+      if (e instanceof SyntaxError) throw new Error(raw)
+      throw e
+    }
+  }
   return await res.json()
 }

@@ -15,7 +15,7 @@ class NivelCriterioRequest extends FormRequest
     {
         return [
             'nombre' => 'required|string|max:255',
-            'valor' => 'required|numeric|min:10|max:70',
+            'valor' => 'required|numeric|min:0|max:100',
             'descripcion' => 'nullable|string',
         ];
     }

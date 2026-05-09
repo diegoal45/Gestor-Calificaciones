@@ -29,14 +29,13 @@
         </div>
 
         <div v-if="(tarea?.tipo || '').toLowerCase() === 'rubrica'" class="mb-3">
-          <label class="form-label">Rúbrica</label>
-          <select v-model="selectedRubricaId" class="form-select mb-2">
-            <option :value="null" disabled>Selecciona una rúbrica</option>
-            <option v-for="r in (tarea?.rubricas || [])" :key="r.id" :value="r.id">{{ r.nombre }}</option>
-          </select>
+          <p class="small text-muted mb-2">
+            Elige un nivel por cada criterio. El porcentaje del nivel (0–100) es el logro sobre el peso de ese criterio; la nota final (0–5) combina todos los criterios de todas las rúbricas de la tarea.
+          </p>
 
-          <div v-if="rubricaActiva">
-            <div v-for="criterio in rubricaActiva.criterios" :key="criterio.id" class="mb-2 border rounded p-2">
+          <div v-for="rubrica in (tarea?.rubricas || [])" :key="rubrica.id" class="mb-4">
+            <div class="fw-semibold mb-2">{{ rubrica.nombre }}</div>
+            <div v-for="criterio in (rubrica.criterios || [])" :key="criterio.id" class="mb-2 border rounded p-2">
               <div class="fw-semibold mb-1">{{ criterio.nombre }} ({{ criterio.peso }}%)</div>
 
               <div class="d-flex flex-wrap gap-2 mb-2">
@@ -114,17 +113,24 @@ const tarea = ref(null)
 const estudiantes = ref([])
 const selectedTareaId = ref(null)
 const selectedEstudianteId = ref(null)
-const selectedRubricaId = ref(null)
 const evaluaciones = ref({})
 const notaManual = ref(null)
 const feedback = ref('')
 
-const rubricaActiva = computed(() => (tarea.value?.rubricas || []).find(r => r.id === Number(selectedRubricaId.value)))
+const todosLosCriteriosRubrica = computed(() => {
+  const list = []
+  for (const r of tarea.value?.rubricas || []) {
+    for (const c of r.criterios || []) {
+      list.push(c)
+    }
+  }
+  return list
+})
 const esRubrica = computed(() => ((tarea.value?.tipo || '').toLowerCase() === 'rubrica'))
 const puedeGuardarRubrica = computed(() => {
   if (saving.value) return false
   if (!esRubrica.value) return true
-  const criterios = rubricaActiva.value?.criterios || []
+  const criterios = todosLosCriteriosRubrica.value
   if (!criterios.length) return false
   return criterios.every(c => !!evaluaciones.value[c.id])
 })
@@ -160,7 +166,6 @@ async function loadContexto() {
     estudiantes.value = res.estudiantes || []
     const queryEst = Number(route.query.estudiante || 0)
     selectedEstudianteId.value = queryEst || estudiantes.value[0]?.id || null
-    selectedRubricaId.value = tarea.value?.rubricas?.[0]?.id || null
     evaluaciones.value = {}
     notaManual.value = null
     feedback.value = ''
@@ -180,8 +185,7 @@ async function guardarCalificacion() {
 
   const payload = { feedback: feedback.value.trim() }
   if ((tarea.value?.tipo || '').toLowerCase() === 'rubrica') {
-    payload.rubrica_id = selectedRubricaId.value
-    payload.evaluaciones = (rubricaActiva.value?.criterios || []).map(c => ({
+    payload.evaluaciones = todosLosCriteriosRubrica.value.map(c => ({
       id_criterio: c.id,
       id_nivel: evaluaciones.value[c.id],
     }))

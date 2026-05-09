@@ -83,7 +83,7 @@
               </div>
               <div class="mt-2">
                 <div class="small text-muted fw-semibold mb-1">
-                  Niveles (Mala / Buena / Excelente) — % del puntaje máximo de este criterio (entre 10 y 70)
+                  Niveles — % de logro si el estudiante queda en ese nivel (0 a 100). Ej.: 60 significa 60% del aporte de este criterio a la nota.
                 </div>
                 <div class="row g-2 small text-muted mb-1 ms-0">
                   <div class="col-md-3">Nombre</div>
@@ -98,8 +98,8 @@
                     <input
                       v-model.number="n.valor"
                       type="number"
-                      min="10"
-                      max="70"
+                      min="0"
+                      max="100"
                       step="1"
                       class="form-control form-control-sm"
                       title="% del puntaje máximo de este criterio al elegir este nivel"
@@ -139,8 +139,8 @@ const showModal = ref(false)
 const form = ref({ id: null, id_tarea: null, nombre: '', criterios: [] })
 let nextKey = 1
 
-const NIVEL_VALOR_MIN = 10
-const NIVEL_VALOR_MAX = 70
+const NIVEL_VALOR_MIN = 0
+const NIVEL_VALOR_MAX = 100
 
 const pesoTotal = computed(() => form.value.criterios.reduce((acc, c) => acc + (Number(c.peso) || 0), 0))
 const pesoRestante = computed(() => 100 - pesoTotal.value)
@@ -223,7 +223,7 @@ function openEdit(rubrica) {
       niveles: (c.niveles || []).map(n => ({
         id: n.id,
         nombre: n.nombre,
-        valor: Math.max(NIVEL_VALOR_MIN, Math.min(NIVEL_VALOR_MAX, Number(n.valor) || NIVEL_VALOR_MIN)),
+        valor: Math.max(NIVEL_VALOR_MIN, Math.min(NIVEL_VALOR_MAX, Number.isFinite(Number(n.valor)) ? Number(n.valor) : 0)),
         descripcion: n.descripcion || '',
       })),
     })),
@@ -237,9 +237,9 @@ function addCriterio() {
     nombre: '',
     peso: 0,
     niveles: [
-      { nombre: 'Mala', valor: 10, descripcion: '' },
-      { nombre: 'Buena', valor: 40, descripcion: '' },
-      { nombre: 'Excelente', valor: 70, descripcion: '' },
+      { nombre: 'Mala', valor: 0, descripcion: '' },
+      { nombre: 'Buena', valor: 50, descripcion: '' },
+      { nombre: 'Excelente', valor: 100, descripcion: '' },
     ],
   })
   const list = form.value.criterios
