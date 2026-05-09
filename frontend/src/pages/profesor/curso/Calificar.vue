@@ -38,25 +38,39 @@
           <div v-if="rubricaActiva">
             <div v-for="criterio in rubricaActiva.criterios" :key="criterio.id" class="mb-2 border rounded p-2">
               <div class="fw-semibold mb-1">{{ criterio.nombre }} ({{ criterio.peso }}%)</div>
-              <select v-model.number="evaluaciones[criterio.id]" class="form-select mb-1">
-                <option :value="null" disabled>Selecciona nivel</option>
-                <option v-for="nivel in criterio.niveles" :key="nivel.id" :value="nivel.id">
-                  {{ nivel.nombre }}
-                </option>
-              </select>
-              <div class="row g-2">
-                <div class="col-md-4">
-                  <label class="small text-muted">Logro (%)</label>
-                  <input v-model.number="porcentajes[criterio.id]" type="number" min="0" max="100" class="form-control form-control-sm" />
-                </div>
-                <div class="col-md-8">
-                  <label class="small text-muted">Descripción</label>
-                  <div class="small">
-                    {{ descripcionNivel(criterio, evaluaciones[criterio.id]) }}
-                  </div>
-                </div>
+
+              <div class="d-flex flex-wrap gap-2 mb-2">
+                <button
+                  v-for="nivel in (criterio.niveles || [])"
+                  :key="nivel.id"
+                  type="button"
+                  class="btn btn-sm border d-flex align-items-center gap-2"
+                  :class="Number(evaluaciones[criterio.id]) === Number(nivel.id) ? 'btn-primary' : 'btn-light'"
+                  @click="evaluaciones[criterio.id] = nivel.id"
+                >
+                  <span
+                    class="nivel-dot"
+                    :class="Number(evaluaciones[criterio.id]) === Number(nivel.id) ? 'nivel-dot--active' : ''"
+                  ></span>
+                  <span class="fw-semibold">{{ nivel.nombre }}</span>
+                  <span
+                    class="badge rounded-pill"
+                    :class="Number(evaluaciones[criterio.id]) === Number(nivel.id) ? 'bg-light text-primary' : 'bg-secondary'"
+                  >
+                    {{ Number(nivel.valor) }}%
+                  </span>
+                </button>
               </div>
-              <div v-if="criterio.niveles && criterio.niveles.length" class="small text-muted">
+
+              <div class="small">
+                <div class="text-muted small mb-1">Descripción</div>
+                <div v-if="evaluaciones[criterio.id]" class="text-body">
+                  {{ descripcionNivel(criterio, evaluaciones[criterio.id]) || '---' }}
+                </div>
+                <div v-else class="text-muted">Selecciona un nivel.</div>
+              </div>
+
+              <div v-if="criterio.niveles && criterio.niveles.length" class="small text-muted mt-2">
                 <span v-for="nivel in criterio.niveles" :key="nivel.id + '-desc'">
                   <strong>{{ nivel.nombre }}:</strong> {{ nivel.descripcion || '---' }}<span v-if="!isLastNivel(criterio, nivel)"> · </span>
                 </span>
@@ -76,7 +90,7 @@
         </div>
 
         <div class="d-flex justify-content-end">
-          <button class="btn btn-primary" :disabled="saving" @click="guardarCalificacion">Guardar calificación</button>
+          <button class="btn btn-primary" :disabled="saving || !puedeGuardarRubrica" @click="guardarCalificacion">Guardar calificación</button>
         </div>
       </div>
     </div>
@@ -102,11 +116,18 @@ const selectedTareaId = ref(null)
 const selectedEstudianteId = ref(null)
 const selectedRubricaId = ref(null)
 const evaluaciones = ref({})
-const porcentajes = ref({})
 const notaManual = ref(null)
 const feedback = ref('')
 
 const rubricaActiva = computed(() => (tarea.value?.rubricas || []).find(r => r.id === Number(selectedRubricaId.value)))
+const esRubrica = computed(() => ((tarea.value?.tipo || '').toLowerCase() === 'rubrica'))
+const puedeGuardarRubrica = computed(() => {
+  if (saving.value) return false
+  if (!esRubrica.value) return true
+  const criterios = rubricaActiva.value?.criterios || []
+  if (!criterios.length) return false
+  return criterios.every(c => !!evaluaciones.value[c.id])
+})
 
 onMounted(async () => {
   await loadTareas()
@@ -141,7 +162,6 @@ async function loadContexto() {
     selectedEstudianteId.value = queryEst || estudiantes.value[0]?.id || null
     selectedRubricaId.value = tarea.value?.rubricas?.[0]?.id || null
     evaluaciones.value = {}
-    porcentajes.value = {}
     notaManual.value = null
     feedback.value = ''
   } catch (e) {
@@ -164,7 +184,6 @@ async function guardarCalificacion() {
     payload.evaluaciones = (rubricaActiva.value?.criterios || []).map(c => ({
       id_criterio: c.id,
       id_nivel: evaluaciones.value[c.id],
-      porcentaje: porcentajes.value[c.id],
     }))
   } else {
     payload.nota = notaManual.value
@@ -198,3 +217,17 @@ function descripcionNivel(criterio, nivelId) {
   return n?.descripcion || ''
 }
 </script>
+
+<style scoped>
+.nivel-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  background: #fff;
+}
+.nivel-dot--active {
+  border-color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.35);
+}
+</style>

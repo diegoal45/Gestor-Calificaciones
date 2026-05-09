@@ -174,7 +174,7 @@ class NotaController extends Controller
             'evaluaciones' => 'nullable|array',
             'evaluaciones.*.id_criterio' => 'required_with:evaluaciones|exists:criterios,id',
             'evaluaciones.*.id_nivel' => 'required_with:evaluaciones|exists:niveles_criterio,id',
-            'evaluaciones.*.porcentaje' => 'required_with:evaluaciones|numeric|min:0|max:100',
+            'evaluaciones.*.porcentaje' => 'nullable|numeric|min:10|max:70',
         ];
         $data = $request->validate($rules);
 
@@ -202,22 +202,31 @@ class NotaController extends Controller
             }
 
             $criteriosPorId = $criterios->keyBy('id');
-            // El % logrado por criterio se define al calificar (no viene fijo en la rúbrica)
             $sumaPonderadaPct = 0;
-            foreach ($evaluacionesPayload as $evaluacion) {
+            $evaluacionesPayload = $evaluacionesPayload->map(function ($evaluacion) use ($criteriosPorId) {
                 $criterioId = (int) $evaluacion['id_criterio'];
                 $nivelId = (int) $evaluacion['id_nivel'];
-                $logroPct = (float) $evaluacion['porcentaje']; // 0..100
                 $criterio = $criteriosPorId->get($criterioId);
                 if (!$criterio) {
-                    return response()->json(['message' => 'Hay criterios inválidos en la evaluación.'], 422);
+                    throw new \InvalidArgumentException('Hay criterios inválidos en la evaluación.');
                 }
 
                 $nivel = $criterio->niveles->firstWhere('id', $nivelId);
                 if (!$nivel) {
-                    return response()->json(['message' => 'Hay niveles inválidos para el criterio seleccionado.'], 422);
+                    throw new \InvalidArgumentException('Hay niveles inválidos para el criterio seleccionado.');
                 }
 
+                $porcentaje = array_key_exists('porcentaje', $evaluacion) && $evaluacion['porcentaje'] !== null
+                    ? (float) $evaluacion['porcentaje']
+                    : (float) $nivel->valor;
+                $porcentaje = max(10, min(70, $porcentaje));
+                $evaluacion['porcentaje'] = $porcentaje;
+                return $evaluacion;
+            });
+
+            foreach ($evaluacionesPayload as $evaluacion) {
+                $criterio = $criteriosPorId->get((int) $evaluacion['id_criterio']);
+                $logroPct = (float) $evaluacion['porcentaje']; // 10..70
                 $sumaPonderadaPct += $logroPct * ((float) $criterio->peso / 100);
             }
 
@@ -230,7 +239,8 @@ class NotaController extends Controller
             return response()->json(['message' => 'Debes ingresar una nota válida para calificación manual.'], 422);
         }
 
-        $nota = DB::transaction(function () use ($tareaId, $estudianteId, $data, $notaValor, $evaluacionesPayload) {
+        try {
+            $nota = DB::transaction(function () use ($tareaId, $estudianteId, $data, $notaValor, $evaluacionesPayload) {
             $nota = Nota::updateOrCreate(
                 ['id_tarea' => $tareaId, 'id_estudiante' => $estudianteId],
                 ['nota' => $notaValor, 'feedback' => $data['feedback']]
@@ -240,14 +250,17 @@ class NotaController extends Controller
             foreach ($evaluacionesPayload as $evaluacion) {
                 EvaluacionRubrica::create([
                     'id_nota' => $nota->id,
-                    'id_criterio' => $evaluacion['id_criterio'],
-                    'id_nivel' => $evaluacion['id_nivel'],
-                    'porcentaje' => $evaluacion['porcentaje'] ?? null,
+                    'id_criterio' => (int) $evaluacion['id_criterio'],
+                    'id_nivel' => (int) $evaluacion['id_nivel'],
+                    'porcentaje' => array_key_exists('porcentaje', $evaluacion) ? (float) $evaluacion['porcentaje'] : null,
                 ]);
             }
 
             return $nota->fresh(['evaluacionesRubrica.criterio', 'evaluacionesRubrica.nivel']);
-        });
+            });
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
 
         return response()->json([
             'message' => 'Calificación guardada',

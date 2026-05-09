@@ -43,7 +43,7 @@ class EstudianteController extends Controller
             return response()->json(['message' => 'El usuario no es un estudiante'], 400);
         }
 
-        $curso = Curso::with(['tareas.notas'])->findOrFail($cursoId);
+        $curso = Curso::with(['tareas.notas.evaluacionesRubrica.criterio', 'tareas.notas.evaluacionesRubrica.nivel'])->findOrFail($cursoId);
 
         $tareasList = [];
         $sumaNotas = 0;
@@ -60,10 +60,29 @@ class EstudianteController extends Controller
             $tareasList[] = [
                 'id' => $tarea->id,
                 'nombre' => $tarea->nombre,
+                'tipo' => $tarea->tipo,
                 'porcentaje' => $tarea->porcentaje,
                 'nota_id' => $notaRecord ? $notaRecord->id : null,
                 'nota' => $notaRecord ? number_format($notaRecord->nota, 1) : null,
                 'feedback' => $notaRecord ? $notaRecord->feedback : null,
+                'rubrica_evaluacion' => $notaRecord
+                    ? collect($notaRecord->evaluacionesRubrica ?? [])->map(function ($ev) {
+                        return [
+                            'criterio' => [
+                                'id' => $ev->criterio?->id,
+                                'nombre' => $ev->criterio?->nombre,
+                                'peso' => $ev->criterio?->peso,
+                            ],
+                            'nivel' => [
+                                'id' => $ev->nivel?->id,
+                                'nombre' => $ev->nivel?->nombre,
+                                'valor' => $ev->nivel?->valor,
+                                'descripcion' => $ev->nivel?->descripcion,
+                            ],
+                            'porcentaje' => $ev->porcentaje,
+                        ];
+                    })->values()
+                    : [],
             ];
         }
 

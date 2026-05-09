@@ -52,6 +52,31 @@
         <div v-for="item in feedbackItems" :key="item.id" class="border rounded p-3 mb-2">
           <div class="fw-bold">{{ item.nombre }}</div>
           <div class="small text-muted">{{ item.feedback }}</div>
+
+          <div
+            v-if="(item.tipo || '').toLowerCase() === 'rubrica' && (item.rubrica_evaluacion || []).length"
+            class="mt-3"
+          >
+            <div class="small text-muted fw-semibold mb-2">Detalle rúbrica</div>
+            <div
+              v-for="(ev, idx) in item.rubrica_evaluacion"
+              :key="idx"
+              class="border rounded p-2 mb-2 bg-light"
+            >
+              <div class="d-flex justify-content-between align-items-start gap-2">
+                <div class="fw-semibold">
+                  {{ ev.criterio?.nombre || 'Criterio' }}
+                  <span class="text-muted fw-normal">({{ ev.criterio?.peso ?? 0 }}%)</span>
+                </div>
+                <span class="badge bg-primary">
+                  {{ ev.nivel?.nombre || 'Nivel' }} · {{ Number(ev.nivel?.valor ?? 0) }}% del criterio
+                </span>
+              </div>
+              <div class="small text-muted mt-2">
+                {{ ev.nivel?.descripcion || '---' }}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

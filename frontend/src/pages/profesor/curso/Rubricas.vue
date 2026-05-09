@@ -59,6 +59,9 @@
               </div>
               <button type="button" class="btn btn-sm btn-light border" @click="addCriterio">Agregar criterio</button>
             </div>
+            <div class="small text-muted mb-2">
+              Los pesos de los criterios deben sumar 100%. Al agregar un criterio, el nuevo lleva lo que falte hasta 100% (si ya sumaban 100%, se redistribuye en partes iguales). Los % por nivel aplican sólo dentro de cada criterio.
+            </div>
             <div v-for="(c, idx) in form.criterios" :key="c._key" class="border rounded p-2 mb-2">
               <div class="row g-2">
                 <div class="col-md-8"><input v-model="c.nombre" class="form-control" placeholder="Nombre criterio" /></div>
@@ -67,20 +70,42 @@
                     v-model.number="c.peso"
                     type="number"
                     min="0"
-                    :max="maxPesoParaCriterio(idx)"
+                    max="100"
+                    step="1"
                     class="form-control"
                     placeholder="Peso %"
                   />
-                  <div class="small text-muted mt-1">Máx: {{ maxPesoParaCriterio(idx) }}%</div>
+                  <div class="small text-muted mt-1">Suma de criterios: 100%. Disponible p. este criterio: hasta {{ maxPesoSugerido(idx) }}%</div>
+                </div>
+                <div class="col-md-12 text-end">
+                  <button type="button" class="btn btn-sm btn-link text-danger p-0" @click="removeCriterio(idx)">Quitar criterio</button>
                 </div>
               </div>
               <div class="mt-2">
-                <div class="small text-muted fw-semibold mb-1">Niveles (Mala / Buena / Excelente)</div>
-                <div class="row g-2" v-for="(n, nIdx) in (c.niveles || [])" :key="nIdx">
+                <div class="small text-muted fw-semibold mb-1">
+                  Niveles (Mala / Buena / Excelente) — % del puntaje máximo de este criterio (entre 10 y 70)
+                </div>
+                <div class="row g-2 small text-muted mb-1 ms-0">
+                  <div class="col-md-3">Nombre</div>
+                  <div class="col-md-2">%</div>
+                  <div class="col-md-7">Descripción</div>
+                </div>
+                <div class="row g-2 align-items-start" v-for="(n, nIdx) in (c.niveles || [])" :key="n.id || `${c._key}-${nIdx}`">
                   <div class="col-md-3">
                     <input v-model="n.nombre" class="form-control form-control-sm" />
                   </div>
-                  <div class="col-md-9">
+                  <div class="col-md-2">
+                    <input
+                      v-model.number="n.valor"
+                      type="number"
+                      min="10"
+                      max="70"
+                      step="1"
+                      class="form-control form-control-sm"
+                      title="% del puntaje máximo de este criterio al elegir este nivel"
+                    />
+                  </div>
+                  <div class="col-md-7">
                     <input v-model="n.descripcion" class="form-control form-control-sm" placeholder="Descripción del nivel (qué se evalúa)" />
                   </div>
                 </div>
@@ -114,6 +139,9 @@ const showModal = ref(false)
 const form = ref({ id: null, id_tarea: null, nombre: '', criterios: [] })
 let nextKey = 1
 
+const NIVEL_VALOR_MIN = 10
+const NIVEL_VALOR_MAX = 70
+
 const pesoTotal = computed(() => form.value.criterios.reduce((acc, c) => acc + (Number(c.peso) || 0), 0))
 const pesoRestante = computed(() => 100 - pesoTotal.value)
 
@@ -128,11 +156,24 @@ const puedeGuardar = computed(() => {
   return pesoTotalValidos.value === 100
 })
 
-function maxPesoParaCriterio(index) {
+/** Cuánto puede valer como máximo este criterio si el resto se deja igual (solo ayuda UI; no limita el input). */
+function maxPesoSugerido(index) {
   const current = Number(form.value.criterios?.[index]?.peso || 0)
   const otherTotal = pesoTotal.value - current
   const max = 100 - otherTotal
   return max < 0 ? 0 : max
+}
+
+/** Reparto equitativo sólo cuando no hay “espacio” para un criterio nuevo (evita segundo criterio con peso 0 bloqueado). */
+function igualarPesosEntreCriterios() {
+  const list = form.value.criterios || []
+  if (!list.length) return
+  const n = list.length
+  const each = Math.floor(100 / n)
+  let leftover = 100 - each * n
+  list.forEach((c, i) => {
+    c.peso = each + (i < leftover ? 1 : 0)
+  })
 }
 
 onMounted(loadData)
@@ -182,7 +223,7 @@ function openEdit(rubrica) {
       niveles: (c.niveles || []).map(n => ({
         id: n.id,
         nombre: n.nombre,
-        valor: Number(n.valor),
+        valor: Math.max(NIVEL_VALOR_MIN, Math.min(NIVEL_VALOR_MAX, Number(n.valor) || NIVEL_VALOR_MIN)),
         descripcion: n.descripcion || '',
       })),
     })),
@@ -196,11 +237,34 @@ function addCriterio() {
     nombre: '',
     peso: 0,
     niveles: [
-      { nombre: 'Mala', descripcion: '' },
-      { nombre: 'Buena', descripcion: '' },
-      { nombre: 'Excelente', descripcion: '' },
+      { nombre: 'Mala', valor: 10, descripcion: '' },
+      { nombre: 'Buena', valor: 40, descripcion: '' },
+      { nombre: 'Excelente', valor: 70, descripcion: '' },
     ],
   })
+  const list = form.value.criterios
+  if (list.length === 1) {
+    list[0].peso = 100
+    return
+  }
+  const others = list.slice(0, -1)
+  const sumOtros = others.reduce((a, c) => a + (Number(c.peso) || 0), 0)
+  const last = list[list.length - 1]
+  if (sumOtros >= 100) {
+    igualarPesosEntreCriterios()
+    return
+  }
+  last.peso = 100 - sumOtros
+}
+
+function removeCriterio(idx) {
+  form.value.criterios.splice(idx, 1)
+  const list = form.value.criterios
+  if (!list.length) return
+  const sum = list.reduce((a, c) => a + (Number(c.peso) || 0), 0)
+  if (sum !== 100) {
+    list[0].peso = Math.max(0, (Number(list[0].peso) || 0) + (100 - sum))
+  }
 }
 
 async function saveRubrica() {
@@ -233,6 +297,12 @@ async function saveRubrica() {
         if (!String(n.descripcion || '').trim()) {
           throw new Error(`Falta la descripción del nivel "${n.nombre}" en el criterio "${criterio.nombre}".`)
         }
+        const v = Number(n.valor)
+        if (!Number.isFinite(v) || v < NIVEL_VALOR_MIN || v > NIVEL_VALOR_MAX) {
+          throw new Error(
+            `El nivel "${n.nombre}" del criterio "${criterio.nombre}" debe tener un peso entre ${NIVEL_VALOR_MIN} y ${NIVEL_VALOR_MAX}%.`
+          )
+        }
       }
 
       if (criterio.id) {
@@ -243,7 +313,7 @@ async function saveRubrica() {
           if (!n.id) continue
           await apiRequest(`/api/niveles-criterio/${n.id}`, 'PUT', {
             nombre: n.nombre,
-            valor: 0,
+            valor: n.valor ?? 0,
             descripcion: n.descripcion,
           })
         }
@@ -252,7 +322,7 @@ async function saveRubrica() {
         for (const n of criterio.niveles) {
           await apiRequest(`/api/niveles-criterio/criterio/${created.id}`, 'POST', {
             nombre: n.nombre,
-            valor: 0,
+            valor: n.valor ?? 0,
             descripcion: n.descripcion,
           })
         }
