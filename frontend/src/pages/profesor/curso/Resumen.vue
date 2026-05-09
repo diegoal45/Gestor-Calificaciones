@@ -18,6 +18,17 @@
 
     <!-- Dashboard Content -->
     <div v-else>
+      <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start gap-3 mb-4">
+        <div>
+          <h4 class="fw-bold mb-1">Panel del curso</h4>
+          <p class="text-muted small m-0">Indicadores generales y exportación de calificaciones.</p>
+        </div>
+        <button type="button" class="btn btn-light border d-flex align-items-center gap-2 fw-medium" @click="exportModal?.open()">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          Exportar planilla
+        </button>
+      </div>
+
       <!-- KPIS -->
       <div class="row g-4 mb-4">
         <!-- Promedio -->
@@ -169,6 +180,7 @@
         </div>
       </div>
 
+      <ExportPlanillaModal ref="exportModal" :curso-id="cursoId" />
     </div>
   </div>
 </template>
@@ -177,6 +189,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { apiRequest } from '../../../api.js'
+import ExportPlanillaModal from '../../../components/ExportPlanillaModal.vue'
 
 const props = defineProps(['curso'])
 const route = useRoute()
@@ -197,6 +210,7 @@ const mockChartData = ref([])
 const recentActivity = ref([])
 const generatingCode = ref(false)
 const copiedCode = ref(false)
+const exportModal = ref(null)
 
 onMounted(async () => {
   await loadResumen()

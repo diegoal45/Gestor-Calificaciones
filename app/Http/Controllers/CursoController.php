@@ -396,6 +396,234 @@ class CursoController extends Controller
         ]);
     }
 
+    /**
+     * Exporta planilla: nombre siempre; columnas opcionales (definitiva, tareas elegidas, asistencia %, correo, grupo).
+     * Formatos: csv, xls (tabla HTML compatible con Excel), json (para imprimir / PDF desde el navegador).
+     */
+    public function exportarPlanilla(Request $request, int $id)
+    {
+        $data = $request->validate([
+            'formato' => 'required|in:csv,xls,json',
+            'incluir_email' => 'sometimes|boolean',
+            'incluir_grupo' => 'sometimes|boolean',
+            'incluir_definitiva' => 'sometimes|boolean',
+            'incluir_asistencia_pct' => 'sometimes|boolean',
+            'tarea_ids' => 'sometimes|array',
+            'tarea_ids.*' => 'integer',
+            'filtro_riesgo' => 'sometimes|in:todos,riesgo',
+        ]);
+
+        $incluirEmail = (bool) ($data['incluir_email'] ?? false);
+        $incluirGrupo = (bool) ($data['incluir_grupo'] ?? false);
+        $incluirDefinitiva = (bool) ($data['incluir_definitiva'] ?? true);
+        $incluirAsistenciaPct = (bool) ($data['incluir_asistencia_pct'] ?? false);
+        $tareaIds = array_values(array_unique(array_map('intval', $data['tarea_ids'] ?? [])));
+        $filtroRiesgo = $data['filtro_riesgo'] ?? 'todos';
+
+        $curso = Curso::with(['tareas', 'inscripciones.estudiante'])->findOrFail($id);
+
+        foreach ($tareaIds as $tid) {
+            if (!$curso->tareas->contains('id', $tid)) {
+                return response()->json(['message' => 'La tarea no pertenece a este curso'], 422);
+            }
+        }
+
+        if (!$incluirDefinitiva && count($tareaIds) === 0) {
+            return response()->json(['message' => 'Incluya la nota definitiva o seleccione al menos una tarea'], 422);
+        }
+
+        $curso->load('tareas.notas');
+
+        $calificacionesMap = [];
+        foreach ($curso->tareas as $tarea) {
+            foreach ($tarea->notas as $nota) {
+                $calificacionesMap[$nota->id_estudiante . '_' . $nota->id_tarea] = (float) $nota->nota;
+            }
+        }
+
+        $asistenciaRows = Asistencia::where('id_curso', $id)->get();
+        $asistenciaPctByEst = [];
+        foreach ($curso->inscripciones as $ins) {
+            $eid = $ins->id_estudiante;
+            $regs = $asistenciaRows->where('id_estudiante', $eid);
+            $total = $regs->count();
+            $presentes = $regs->where('estado', 'presente')->count();
+            $asistenciaPctByEst[$eid] = $total > 0 ? round(($presentes / $total) * 100, 2) : 0;
+        }
+
+        $tareasOrdered = $curso->tareas->sortBy('id')->values();
+        $selectedTareas = collect($tareaIds)
+            ->map(fn ($tid) => $curso->tareas->firstWhere('id', $tid))
+            ->filter()
+            ->values();
+
+        $headers = ['Nombre'];
+        if ($incluirEmail) {
+            $headers[] = 'Correo';
+        }
+        if ($incluirGrupo) {
+            $headers[] = 'Grupo';
+        }
+        foreach ($selectedTareas as $t) {
+            $p = (float) ($t->porcentaje ?? 0);
+            $headers[] = $p > 0 ? ($t->nombre . ' (' . $p . '%)') : $t->nombre;
+        }
+        if ($incluirAsistenciaPct && $curso->usa_asistencia) {
+            $headers[] = 'Asistencia %';
+        }
+        if ($incluirDefinitiva) {
+            $headers[] = 'Nota definitiva';
+        }
+
+        $rows = [];
+        foreach ($curso->inscripciones as $ins) {
+            $est = $ins->estudiante;
+            $eid = $est->id;
+            $defStr = $this->calcularNotaDefinitivaPlanilla(
+                $curso,
+                $eid,
+                $tareasOrdered,
+                $calificacionesMap,
+                $asistenciaPctByEst[$eid] ?? 0.0
+            );
+
+            if ($filtroRiesgo === 'riesgo') {
+                if ($defStr === null) {
+                    continue;
+                }
+                $val = (float) $defStr;
+                if (!($val > 0 && $val < 3.0)) {
+                    continue;
+                }
+            }
+
+            $row = [$est->nombre];
+            if ($incluirEmail) {
+                $row[] = $est->email ?? '';
+            }
+            if ($incluirGrupo) {
+                $row[] = (string) ($ins->grupo ?? '');
+            }
+            foreach ($selectedTareas as $t) {
+                $key = $eid . '_' . $t->id;
+                $row[] = isset($calificacionesMap[$key])
+                    ? number_format($calificacionesMap[$key], 1, '.', '')
+                    : '';
+            }
+            if ($incluirAsistenciaPct && $curso->usa_asistencia) {
+                $row[] = number_format($asistenciaPctByEst[$eid] ?? 0, 2, '.', '');
+            }
+            if ($incluirDefinitiva) {
+                $row[] = $defStr ?? '';
+            }
+            $rows[] = $row;
+        }
+
+        $payload = [
+            'curso_nombre' => $curso->nombre,
+            'headers' => $headers,
+            'rows' => $rows,
+        ];
+
+        if ($data['formato'] === 'json') {
+            return response()->json($payload);
+        }
+
+        $slug = preg_replace('/[^a-zA-Z0-9_-]+/', '_', $curso->nombre);
+        $slug = trim((string) $slug, '_') ?: 'curso';
+        $date = now()->format('Y-m-d');
+        $ext = $data['formato'] === 'csv' ? 'csv' : 'xls';
+        $filename = "{$slug}_planilla_{$date}.{$ext}";
+
+        return response()->streamDownload(function () use ($data, $payload) {
+            if ($data['formato'] === 'csv') {
+                $out = fopen('php://output', 'w');
+                fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
+                fputcsv($out, $payload['headers']);
+                foreach ($payload['rows'] as $row) {
+                    fputcsv($out, $row);
+                }
+                fclose($out);
+
+                return;
+            }
+
+            echo '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"></head><body><table border="1">';
+            echo '<tr>';
+            foreach ($payload['headers'] as $h) {
+                echo '<th>' . htmlspecialchars((string) $h, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</th>';
+            }
+            echo '</tr>';
+            foreach ($payload['rows'] as $row) {
+                echo '<tr>';
+                foreach ($row as $cell) {
+                    echo '<td>' . htmlspecialchars((string) $cell, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</td>';
+                }
+                echo '</tr>';
+            }
+            echo '</table></body></html>';
+        }, $filename, [
+            'Content-Type' => $data['formato'] === 'csv'
+                ? 'text/csv; charset=UTF-8'
+                : 'application/vnd.ms-excel',
+        ]);
+    }
+
+    /**
+     * Misma lógica que la planilla en frontend (ponderación, tareas sin %, asistencia opcional).
+     */
+    protected function calcularNotaDefinitivaPlanilla(
+        Curso $curso,
+        int $estudianteId,
+        $tareas,
+        array $calificacionesMap,
+        float $asistenciaPct
+    ): ?string {
+        $sumaPonderada = 0.0;
+        $totalPorcentaje = 0.0;
+        $sumaSimple = 0.0;
+        $cantidadSimple = 0;
+
+        foreach ($tareas as $tarea) {
+            $key = $estudianteId . '_' . $tarea->id;
+            if (!array_key_exists($key, $calificacionesMap)) {
+                continue;
+            }
+            $nota = (float) $calificacionesMap[$key];
+            $porcentaje = (float) ($tarea->porcentaje ?? 0);
+            if ($porcentaje > 0) {
+                $sumaPonderada += $nota * ($porcentaje / 100);
+                $totalPorcentaje += $porcentaje;
+            } else {
+                $sumaSimple += $nota;
+                $cantidadSimple++;
+            }
+        }
+
+        $promedioBase = null;
+        if ($totalPorcentaje > 0) {
+            $promedioBase = $sumaPonderada / ($totalPorcentaje / 100);
+        } elseif ($cantidadSimple > 0) {
+            $promedioBase = $sumaSimple / $cantidadSimple;
+        }
+
+        if ($promedioBase === null) {
+            return null;
+        }
+
+        if ($curso->usa_asistencia) {
+            $pesoAsis = (float) ($curso->peso_asistencia ?? 0);
+            $pesoNotas = max(0.0, 100.0 - $pesoAsis);
+            $notaMaxima = (float) ($curso->nota_maxima ?? 5);
+            $notaAsis = ($asistenciaPct / 100.0) * $notaMaxima;
+            $final = ($promedioBase * ($pesoNotas / 100.0)) + ($notaAsis * ($pesoAsis / 100.0));
+
+            return number_format($final, 1, '.', '');
+        }
+
+        return number_format($promedioBase, 1, '.', '');
+    }
+
     // Dashboard: Guardar Calificación (Upsert)
     public function guardarCalificacion(Request $request, int $id)
     {

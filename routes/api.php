@@ -48,6 +48,7 @@ Route::middleware('auth:sanctum')->group(function () {
 	// Cursos - Vistas Profesor
 	Route::get('cursos/{id}/resumen', [CursoController::class, 'resumen']);
 	Route::get('cursos/{id}/planilla', [CursoController::class, 'planilla']);
+	Route::post('cursos/{id}/exportar-planilla', [CursoController::class, 'exportarPlanilla']);
 	Route::get('cursos/{id}/analisis', [CursoController::class, 'analisis']);
 	Route::post('cursos/{id}/calificaciones', [CursoController::class, 'guardarCalificacion']);
 	Route::get('cursos/{id}/estudiantes', [CursoController::class, 'estudiantes']);

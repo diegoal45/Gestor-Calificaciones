@@ -5,7 +5,10 @@
         <h4 class="fw-bold mb-1">Registro de Asistencia</h4>
         <p class="text-muted small m-0">Asistencia global del curso y su impacto opcional en la nota final</p>
       </div>
-      <div class="d-flex gap-3 align-items-center">
+      <div class="d-flex gap-3 align-items-center flex-wrap">
+        <button type="button" class="btn btn-light border fw-medium" @click="exportModal?.open()">
+          Exportar planilla
+        </button>
         <input type="date" class="form-control" v-model="fechaActual" @change="loadAsistencia">
         <button class="btn btn-primary-custom px-4 fw-bold" @click="guardarAsistencia" :disabled="saving">
           <span v-if="saving" class="spinner-border spinner-border-sm me-2"></span>
@@ -77,18 +80,21 @@
       </div>
     </div>
 
+    <ExportPlanillaModal ref="exportModal" :curso-id="cursoId" />
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import { apiRequest } from '../../../api.js'
+import ExportPlanillaModal from '../../../components/ExportPlanillaModal.vue'
 
 import { useRoute } from 'vue-router'
 
 const route = useRoute()
 const cursoId = route.params.id
 
+const exportModal = ref(null)
 const loading = ref(true)
 const saving = ref(false)
 const savingConfig = ref(false)

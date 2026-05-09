@@ -5,10 +5,16 @@
         <h4 class="fw-bold mb-1">Gestión de Tareas</h4>
         <p class="text-muted small m-0">Administra las evaluaciones del curso</p>
       </div>
-      <button class="btn btn-primary-custom d-flex align-items-center gap-2 fw-bold" @click="abrirModal('crear')">
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-        Nueva Tarea
-      </button>
+      <div class="d-flex gap-2">
+        <button type="button" class="btn btn-light border d-flex align-items-center gap-2 fw-medium" @click="exportModal?.open()">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          Exportar planilla
+        </button>
+        <button class="btn btn-primary-custom d-flex align-items-center gap-2 fw-bold" @click="abrirModal('crear')">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          Nueva Tarea
+        </button>
+      </div>
     </div>
 
     <!-- Error State -->
@@ -172,6 +178,7 @@
       </div>
     </div>
 
+    <ExportPlanillaModal ref="exportModal" :curso-id="cursoId" />
   </div>
 </template>
 
@@ -179,11 +186,13 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { apiRequest } from '../../../api.js'
+import ExportPlanillaModal from '../../../components/ExportPlanillaModal.vue'
 
 const route = useRoute()
 const router = useRouter()
 const cursoId = route.params.id
 
+const exportModal = ref(null)
 const loading = ref(true)
 const error = ref('')
 const tareas = ref([])

@@ -17,7 +17,7 @@
           <option value="manual">Solo manuales</option>
           <option value="rubrica">Solo rúbricas</option>
         </select>
-        <button class="btn btn-light border d-flex align-items-center gap-2 text-muted fw-medium">
+        <button type="button" class="btn btn-light border d-flex align-items-center gap-2 text-muted fw-medium" @click="exportModal?.open()">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
           Exportar
         </button>
@@ -93,6 +93,8 @@
         </tbody>
       </table>
     </div>
+
+    <ExportPlanillaModal ref="exportModal" :curso-id="cursoId" />
   </div>
 </template>
 
@@ -100,6 +102,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { apiRequest } from '../../../api.js'
+import ExportPlanillaModal from '../../../components/ExportPlanillaModal.vue'
 
 const props = defineProps(['curso'])
 const route = useRoute()
@@ -115,6 +118,7 @@ const asistenciaMap = ref({}) // Mapa { 'estId': porcentaje asistencia }
 const cursoConfig = ref({ usa_asistencia: false, peso_asistencia: 0, nota_maxima: 5 })
 const filtroNombre = ref('')
 const filtroTipoTarea = ref('todas')
+const exportModal = ref(null)
 
 onMounted(async () => {
   await loadPlanilla()
