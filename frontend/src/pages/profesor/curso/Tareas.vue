@@ -119,10 +119,19 @@
                   {{ cursoConfig.peso_asistencia }}% esta reservado para asistencia del curso.
                 </div>
                 <div class="form-check form-switch mb-2">
-                  <input class="form-check-input" type="checkbox" id="usarPonderacion" v-model="usaPonderacion">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    id="usarPonderacion"
+                    v-model="usaPonderacion"
+                    :disabled="(cursoConfig.metodo_calificacion || 'ponderacion') === 'promedio'"
+                  >
                   <label class="form-check-label small text-muted" for="usarPonderacion">
                     Usar ponderacion en nota final
                   </label>
+                </div>
+                <div class="small text-muted mb-2" v-if="(cursoConfig.metodo_calificacion || 'ponderacion') === 'promedio'">
+                  Este curso usa <strong>promedio simple</strong>, así que las tareas no manejan porcentajes.
                 </div>
                 <input
                   v-model="formData.porcentaje"
@@ -130,7 +139,7 @@
                   min="0"
                   :max="Math.max(0, porcentajeDisponible)"
                   class="form-control custom-input text-end"
-                  :disabled="!usaPonderacion"
+                  :disabled="(cursoConfig.metodo_calificacion || 'ponderacion') === 'promedio' || !usaPonderacion"
                   :required="usaPonderacion"
                 >
                 <div class="small text-muted mt-1" v-if="!usaPonderacion">
@@ -210,7 +219,7 @@ const formData = ref({
   tipo: 'manual'
 })
 const usaPonderacion = ref(true)
-const cursoConfig = ref({ usa_asistencia: false, peso_asistencia: 0 })
+const cursoConfig = ref({ usa_asistencia: false, peso_asistencia: 0, metodo_calificacion: 'ponderacion' })
 
 const porcentajeAsignado = computed(() => {
   const currentId = formData.value.id
@@ -243,6 +252,7 @@ async function loadTareas() {
     cursoConfig.value = {
       usa_asistencia: !!curso?.usa_asistencia,
       peso_asistencia: Number(curso?.peso_asistencia || 0),
+      metodo_calificacion: String(curso?.metodo_calificacion || 'ponderacion').toLowerCase(),
     }
   } catch (e) {
     console.error("Error cargando Tareas", e)
@@ -256,7 +266,9 @@ function abrirModal(mode, tarea = null) {
   modalMode.value = mode
   if (mode === 'editar' && tarea) {
     formData.value = { ...tarea }
-    usaPonderacion.value = Number(tarea.porcentaje || 0) > 0
+    usaPonderacion.value = cursoConfig.value.metodo_calificacion === 'promedio'
+      ? false
+      : (Number(tarea.porcentaje || 0) > 0)
   } else {
     formData.value = { id: null, nombre: '', descripcion: '', fecha_limite: '', porcentaje: 0, tipo: 'manual' }
     usaPonderacion.value = false
@@ -273,6 +285,12 @@ async function guardarTarea() {
   error.value = ''
   try {
     const payload = { ...formData.value }
+    const metodo = String(cursoConfig.value.metodo_calificacion || 'ponderacion').toLowerCase()
+    if (metodo === 'promedio') {
+      // En promedio simple, los porcentajes no aplican.
+      payload.porcentaje = 0
+      usaPonderacion.value = false
+    } else {
     if (usaPonderacion.value) {
       const porcentaje = Number(payload.porcentaje)
       if (Number.isNaN(porcentaje) || porcentaje <= 0) {
@@ -284,6 +302,7 @@ async function guardarTarea() {
       payload.porcentaje = porcentaje
     } else {
       payload.porcentaje = 0
+    }
     }
 
     const endpoint = modalMode.value === 'crear' 

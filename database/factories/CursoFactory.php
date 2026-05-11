@@ -19,6 +19,7 @@ class CursoFactory extends Factory
             'nota_maxima' => 20,
             'usa_asistencia' => $this->faker->boolean(),
             'peso_asistencia' => $this->faker->randomFloat(2, 0, 20),
+            'metodo_calificacion' => $this->faker->randomElement([Curso::METODO_PONDERACION, Curso::METODO_PROMEDIO]),
             'codigo_invitacion' => strtoupper($this->faker->unique()->bothify('INVITE####')),
         ];
     }

@@ -135,6 +135,17 @@
               </div>
             </div>
 
+            <div class="mb-4">
+              <label class="form-label fw-medium text-muted small">Método de calificación</label>
+              <select v-model="newCurso.metodo_calificacion" class="form-select custom-input">
+                <option value="ponderacion">Ponderación (porcentajes por tarea)</option>
+                <option value="promedio">Promedio simple (sin porcentajes)</option>
+              </select>
+              <div class="small text-muted mt-1">
+                Este método define cómo se calcula el promedio/definitiva del curso para planilla, resumen y análisis.
+              </div>
+            </div>
+
             <div class="d-flex justify-content-end gap-2 pt-3 border-top">
               <button type="button" class="btn btn-light fw-medium px-4" @click="showCreateModal = false">Cancelar</button>
               <button type="submit" class="btn btn-primary-custom fw-bold px-4" :disabled="savingCurso">
@@ -171,7 +182,8 @@ const newCurso = ref({
   nombre: '',
   descripcion: '',
   nota_minima: 3.0,
-  nota_maxima: 5.0
+  nota_maxima: 5.0,
+  metodo_calificacion: 'ponderacion',
 })
 
 onMounted(async () => {
@@ -210,7 +222,7 @@ async function loadCursos(page = 1) {
 }
 
 function crearCurso() {
-  newCurso.value = { nombre: '', descripcion: '', nota_minima: 3.0, nota_maxima: 5.0 }
+  newCurso.value = { nombre: '', descripcion: '', nota_minima: 3.0, nota_maxima: 5.0, metodo_calificacion: 'ponderacion' }
   showCreateModal.value = true
 }
 

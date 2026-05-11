@@ -115,7 +115,7 @@ const headers = ref([])
 const estudiantes = ref([])
 const calificaciones = ref({}) // Mapa { 'estId_tareaId': nota }
 const asistenciaMap = ref({}) // Mapa { 'estId': porcentaje asistencia }
-const cursoConfig = ref({ usa_asistencia: false, peso_asistencia: 0, nota_maxima: 5 })
+const cursoConfig = ref({ usa_asistencia: false, peso_asistencia: 0, nota_maxima: 5, metodo_calificacion: 'ponderacion' })
 const filtroNombre = ref('')
 const filtroTipoTarea = ref('todas')
 const exportModal = ref(null)
@@ -131,7 +131,7 @@ async function loadPlanilla() {
     const res = await apiRequest(`/api/cursos/${cursoId}/planilla`)
     headers.value = res.tareas || []
     estudiantes.value = res.estudiantes || []
-    cursoConfig.value = res.curso || { usa_asistencia: false, peso_asistencia: 0, nota_maxima: 5 }
+    cursoConfig.value = res.curso || { usa_asistencia: false, peso_asistencia: 0, nota_maxima: 5, metodo_calificacion: 'ponderacion' }
     
     // Convert array of grades to map for O(1) lookup
     const map = {}
@@ -173,6 +173,30 @@ const estudiantesFiltrados = computed(() => {
 })
 
 function calcularPromedio(estId) {
+  const metodo = String(cursoConfig.value.metodo_calificacion || 'ponderacion').toLowerCase()
+  if (metodo === 'promedio') {
+    let suma = 0
+    let count = 0
+    headers.value.forEach(t => {
+      const notaRaw = getNota(estId, t.id)
+      const nota = Number(notaRaw)
+      if (notaRaw === undefined || notaRaw === null || Number.isNaN(nota)) return
+      suma += nota
+      count++
+    })
+    if (count <= 0) return '-'
+
+    let promedioBase = suma / count
+    if (cursoConfig.value.usa_asistencia) {
+      const pesoAsis = Number(cursoConfig.value.peso_asistencia || 0)
+      const pesoNotas = Math.max(0, 100 - pesoAsis)
+      const notaAsis = getAsistenciaNota(estId)
+      const final = (promedioBase * (pesoNotas / 100)) + (notaAsis * (pesoAsis / 100))
+      return final.toFixed(1)
+    }
+    return promedioBase.toFixed(1)
+  }
+
   let sumaPonderada = 0
   let totalPorcentaje = 0
   let sumaSimple = 0

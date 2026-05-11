@@ -8,6 +8,70 @@ use Illuminate\Http\Request;
 
 class CursoController extends Controller
 {
+    /**
+     * Calcula nota base según el método del curso y aplica asistencia si corresponde.
+     * Retorna null si el estudiante aún no tiene notas.
+     */
+    protected function calcularDefinitivaEstudiante(Curso $curso, int $estudianteId, float $asistenciaPct = 0.0): ?float
+    {
+        $metodo = $curso->metodo_calificacion ?: Curso::METODO_PONDERACION;
+
+        $sumaPonderada = 0.0;
+        $totalPorcentaje = 0.0;
+        $sumaSimple = 0.0;
+        $cantidadSimple = 0;
+
+        foreach ($curso->tareas as $tarea) {
+            $nota = $tarea->notas->where('id_estudiante', $estudianteId)->first();
+            if (!$nota) {
+                continue;
+            }
+
+            $valor = (float) $nota->nota;
+
+            if ($metodo === Curso::METODO_PROMEDIO) {
+                $sumaSimple += $valor;
+                $cantidadSimple++;
+                continue;
+            }
+
+            $porcentaje = (float) ($tarea->porcentaje ?? 0);
+            if ($porcentaje > 0) {
+                $sumaPonderada += $valor * ($porcentaje / 100);
+                $totalPorcentaje += $porcentaje;
+            } else {
+                $sumaSimple += $valor;
+                $cantidadSimple++;
+            }
+        }
+
+        $promedioBase = null;
+        if ($metodo === Curso::METODO_PROMEDIO) {
+            $promedioBase = $cantidadSimple > 0 ? ($sumaSimple / $cantidadSimple) : null;
+        } else {
+            if ($totalPorcentaje > 0) {
+                $promedioBase = $sumaPonderada / ($totalPorcentaje / 100);
+            } elseif ($cantidadSimple > 0) {
+                $promedioBase = $sumaSimple / $cantidadSimple;
+            }
+        }
+
+        if ($promedioBase === null) {
+            return null;
+        }
+
+        if ($curso->usa_asistencia) {
+            $pesoAsis = (float) ($curso->peso_asistencia ?? 0);
+            $pesoNotas = max(0.0, 100.0 - $pesoAsis);
+            $notaMaxima = (float) ($curso->nota_maxima ?? 5);
+            $notaAsis = ($asistenciaPct / 100.0) * $notaMaxima;
+
+            return ($promedioBase * ($pesoNotas / 100.0)) + ($notaAsis * ($pesoAsis / 100.0));
+        }
+
+        return $promedioBase;
+    }
+
     // Generar código de invitación para un curso
     /**
      * Genera un código de invitación para un curso.
@@ -104,11 +168,14 @@ class CursoController extends Controller
         // Agregar métricas básicas para el Dashboard
         foreach ($cursos as $curso) {
             $curso->estudiantes_count = $curso->inscripciones->count();
-            
-            $notas = $curso->tareas->flatMap(function ($tarea) {
-                return $tarea->notas;
-            });
-            $promedio = $notas->avg('nota');
+
+            $defs = [];
+            foreach ($curso->inscripciones as $ins) {
+                $eid = (int) $ins->id_estudiante;
+                $def = $this->calcularDefinitivaEstudiante($curso, $eid, 0.0);
+                if ($def !== null) $defs[] = $def;
+            }
+            $promedio = count($defs) > 0 ? (array_sum($defs) / count($defs)) : null;
             $curso->promedio_general = $promedio !== null ? round($promedio, 2) : 0;
             
             // Para evitar enviar demasiados datos, podríamos ocultar `tareas` e `inscripciones` si no se necesitan,
@@ -142,12 +209,18 @@ class CursoController extends Controller
         ])->findOrFail($id);
 
         // Resumen de rendimiento (promedio general, cantidad de aprobados, reprobados)
-        $notas = $curso->tareas->flatMap(function ($tarea) {
-            return $tarea->notas;
-        });
-        $promedio = $notas->avg('nota');
-        $aprobados = $notas->where('nota', '>=', $curso->nota_minima_aprobatoria)->count();
-        $reprobados = $notas->where('nota', '<', $curso->nota_minima_aprobatoria)->count();
+        $defs = [];
+        $aprobados = 0;
+        $reprobados = 0;
+        foreach ($curso->inscripciones as $ins) {
+            $eid = (int) $ins->id_estudiante;
+            $def = $this->calcularDefinitivaEstudiante($curso, $eid, 0.0);
+            if ($def === null) continue;
+            $defs[] = $def;
+            if ($def >= (float) $curso->nota_minima_aprobatoria) $aprobados++;
+            else $reprobados++;
+        }
+        $promedio = count($defs) > 0 ? (array_sum($defs) / count($defs)) : null;
 
         $resumen = [
             'promedio_general' => $promedio,
@@ -177,6 +250,7 @@ class CursoController extends Controller
             'nota_maxima' => $data['nota_maxima'],
             'usa_asistencia' => $data['usa_asistencia'] ?? false,
             'peso_asistencia' => $data['peso_asistencia'] ?? null,
+            'metodo_calificacion' => $data['metodo_calificacion'] ?? Curso::METODO_PONDERACION,
         ]);
         return response()->json($curso, 201);
     }
@@ -199,6 +273,7 @@ class CursoController extends Controller
             'nota_maxima' => $data['nota_maxima'],
             'usa_asistencia' => $data['usa_asistencia'] ?? $curso->usa_asistencia,
             'peso_asistencia' => $data['peso_asistencia'] ?? $curso->peso_asistencia,
+            'metodo_calificacion' => $data['metodo_calificacion'] ?? ($curso->metodo_calificacion ?: Curso::METODO_PONDERACION),
         ]);
         return response()->json($curso);
     }
@@ -257,8 +332,25 @@ class CursoController extends Controller
     {
         $curso = Curso::with(['tareas.notas', 'inscripciones.estudiante'])->findOrFail($id);
 
-        $notasTotales = $curso->tareas->flatMap->notas;
-        $promedioGeneral = $notasTotales->avg('nota') ?? 0;
+        $asistenciaRows = Asistencia::where('id_curso', $id)->get();
+        $asistenciaPctByEst = [];
+        foreach ($curso->inscripciones as $ins) {
+            $eid = (int) $ins->id_estudiante;
+            $regs = $asistenciaRows->where('id_estudiante', $eid);
+            $total = $regs->count();
+            $presentes = $regs->where('estado', 'presente')->count();
+            $asistenciaPctByEst[$eid] = $total > 0 ? round(($presentes / $total) * 100, 2) : 0;
+        }
+
+        $definitivas = [];
+        foreach ($curso->inscripciones as $ins) {
+            $eid = (int) $ins->id_estudiante;
+            $def = $this->calcularDefinitivaEstudiante($curso, $eid, (float) ($asistenciaPctByEst[$eid] ?? 0));
+            if ($def !== null) {
+                $definitivas[] = $def;
+            }
+        }
+        $promedioGeneral = count($definitivas) > 0 ? (array_sum($definitivas) / count($definitivas)) : 0;
         
         $aprobados = 0;
         $riesgo = 0;
@@ -266,17 +358,11 @@ class CursoController extends Controller
         foreach ($curso->inscripciones as $inscripcion) {
             $estudianteId = $inscripcion->id_estudiante;
             
-            // Calculate student average
-            $sumaNotas = 0;
-            $pesoTotal = 0;
-            foreach ($curso->tareas as $tarea) {
-                $nota = $tarea->notas->where('id_estudiante', $estudianteId)->first();
-                if ($nota) {
-                    $sumaNotas += $nota->nota * ($tarea->porcentaje / 100);
-                    $pesoTotal += $tarea->porcentaje;
-                }
-            }
-            $promedioEstudiante = $pesoTotal > 0 ? ($sumaNotas / ($pesoTotal / 100)) : 0;
+            $promedioEstudiante = (float) ($this->calcularDefinitivaEstudiante(
+                $curso,
+                (int) $estudianteId,
+                (float) ($asistenciaPctByEst[(int) $estudianteId] ?? 0)
+            ) ?? 0);
             
             if ($promedioEstudiante >= $curso->nota_minima_aprobatoria) {
                 $aprobados++;
@@ -292,6 +378,7 @@ class CursoController extends Controller
             '4.0-5.0' => 0,
         ];
 
+        $notasTotales = $curso->tareas->flatMap->notas;
         foreach ($notasTotales as $nota) {
             $valor = (float) $nota->nota;
             if ($valor < 2.0) {
@@ -392,6 +479,7 @@ class CursoController extends Controller
                 'usa_asistencia' => (bool) $curso->usa_asistencia,
                 'peso_asistencia' => $curso->peso_asistencia ? (float) $curso->peso_asistencia : 0,
                 'nota_maxima' => (float) $curso->nota_maxima,
+                'metodo_calificacion' => $curso->metodo_calificacion ?: Curso::METODO_PONDERACION,
             ],
         ]);
     }
@@ -579,6 +667,7 @@ class CursoController extends Controller
         array $calificacionesMap,
         float $asistenciaPct
     ): ?string {
+        $metodo = $curso->metodo_calificacion ?: Curso::METODO_PONDERACION;
         $sumaPonderada = 0.0;
         $totalPorcentaje = 0.0;
         $sumaSimple = 0.0;
@@ -590,6 +679,13 @@ class CursoController extends Controller
                 continue;
             }
             $nota = (float) $calificacionesMap[$key];
+
+            if ($metodo === Curso::METODO_PROMEDIO) {
+                $sumaSimple += $nota;
+                $cantidadSimple++;
+                continue;
+            }
+
             $porcentaje = (float) ($tarea->porcentaje ?? 0);
             if ($porcentaje > 0) {
                 $sumaPonderada += $nota * ($porcentaje / 100);
@@ -601,10 +697,14 @@ class CursoController extends Controller
         }
 
         $promedioBase = null;
-        if ($totalPorcentaje > 0) {
-            $promedioBase = $sumaPonderada / ($totalPorcentaje / 100);
-        } elseif ($cantidadSimple > 0) {
-            $promedioBase = $sumaSimple / $cantidadSimple;
+        if ($metodo === Curso::METODO_PROMEDIO) {
+            $promedioBase = $cantidadSimple > 0 ? ($sumaSimple / $cantidadSimple) : null;
+        } else {
+            if ($totalPorcentaje > 0) {
+                $promedioBase = $sumaPonderada / ($totalPorcentaje / 100);
+            } elseif ($cantidadSimple > 0) {
+                $promedioBase = $sumaSimple / $cantidadSimple;
+            }
         }
 
         if ($promedioBase === null) {
@@ -651,21 +751,24 @@ class CursoController extends Controller
     public function estudiantes(int $id)
     {
         $curso = Curso::with(['inscripciones.estudiante', 'tareas.notas'])->findOrFail($id);
+        $asistenciaRows = Asistencia::where('id_curso', $id)->get();
+        $asistenciaPctByEst = [];
+        foreach ($curso->inscripciones as $ins) {
+            $eid = (int) $ins->id_estudiante;
+            $regs = $asistenciaRows->where('id_estudiante', $eid);
+            $total = $regs->count();
+            $presentes = $regs->where('estado', 'presente')->count();
+            $asistenciaPctByEst[$eid] = $total > 0 ? round(($presentes / $total) * 100, 2) : 0;
+        }
         
-        $estudiantes = $curso->inscripciones->map(function ($ins) use ($curso) {
+        $estudiantes = $curso->inscripciones->map(function ($ins) use ($curso, $asistenciaPctByEst) {
             $estudianteId = $ins->estudiante->id;
-            
-            // Calculate student average
-            $sumaNotas = 0;
-            $pesoTotal = 0;
-            foreach ($curso->tareas as $tarea) {
-                $nota = $tarea->notas->where('id_estudiante', $estudianteId)->first();
-                if ($nota) {
-                    $sumaNotas += $nota->nota * ($tarea->porcentaje / 100);
-                    $pesoTotal += $tarea->porcentaje;
-                }
-            }
-            $promedio = $pesoTotal > 0 ? ($sumaNotas / ($pesoTotal / 100)) : 0;
+
+            $promedio = (float) ($this->calcularDefinitivaEstudiante(
+                $curso,
+                (int) $estudianteId,
+                (float) ($asistenciaPctByEst[(int) $estudianteId] ?? 0)
+            ) ?? 0);
             
             $estado = 'Normal';
             $riesgo = 'Bajo';
@@ -699,17 +802,12 @@ class CursoController extends Controller
         // Calcular promedio de cada estudiante para determinar riesgo/óptimo
         foreach ($curso->inscripciones as $inscripcion) {
             $estudianteId = $inscripcion->id_estudiante;
-            
-            $sumaNotas = 0;
-            $pesoTotal = 0;
-            foreach ($curso->tareas as $tarea) {
-                $nota = $tarea->notas->where('id_estudiante', $estudianteId)->first();
-                if ($nota) {
-                    $sumaNotas += $nota->nota * ($tarea->porcentaje / 100);
-                    $pesoTotal += $tarea->porcentaje;
-                }
-            }
-            $promedio = $pesoTotal > 0 ? ($sumaNotas / ($pesoTotal / 100)) : 0;
+
+            $promedio = (float) ($this->calcularDefinitivaEstudiante(
+                $curso,
+                (int) $estudianteId,
+                0.0
+            ) ?? 0);
 
             if ($promedio > 0 && $promedio < 3.0) {
                 $riesgoCount++;

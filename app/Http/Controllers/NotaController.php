@@ -12,6 +12,47 @@ use Illuminate\Support\Facades\DB;
 
 class NotaController extends Controller
 {
+    private function calcularPromedioCursoParaEstudiante(Curso $curso, int $estudianteId): float
+    {
+        $metodo = $curso->metodo_calificacion ?: Curso::METODO_PONDERACION;
+
+        $sumaPonderada = 0.0;
+        $totalPorcentaje = 0.0;
+        $sumaSimple = 0.0;
+        $cantidad = 0;
+
+        foreach ($curso->tareas as $tarea) {
+            $nota = $tarea->notas->where('id_estudiante', $estudianteId)->first();
+            if (!$nota) continue;
+
+            $valor = (float) $nota->nota;
+            if ($metodo === Curso::METODO_PROMEDIO) {
+                $sumaSimple += $valor;
+                $cantidad++;
+                continue;
+            }
+
+            $p = (float) ($tarea->porcentaje ?? 0);
+            if ($p > 0) {
+                $sumaPonderada += $valor * ($p / 100);
+                $totalPorcentaje += $p;
+            } else {
+                $sumaSimple += $valor;
+                $cantidad++;
+            }
+        }
+
+        if ($metodo === Curso::METODO_PROMEDIO) {
+            return $cantidad > 0 ? ($sumaSimple / $cantidad) : 0.0;
+        }
+
+        if ($totalPorcentaje > 0) {
+            return $sumaPonderada / ($totalPorcentaje / 100);
+        }
+
+        return $cantidad > 0 ? ($sumaSimple / $cantidad) : 0.0;
+    }
+
     // Listar notas de una tarea
     /**
      * Lista notas de una tarea.
@@ -96,11 +137,8 @@ class NotaController extends Controller
      */
     public function promedio(int $cursoId, int $estudianteId)
     {
-        $tareas = Tarea::where('id_curso', $cursoId)->get();
-        $notas = Nota::whereIn('id_tarea', $tareas->pluck('id'))
-            ->where('id_estudiante', $estudianteId)
-            ->get();
-        $promedio = $notas->avg('nota');
+        $curso = Curso::with(['tareas.notas'])->findOrFail($cursoId);
+        $promedio = $this->calcularPromedioCursoParaEstudiante($curso, $estudianteId);
         return response()->json(['promedio' => $promedio]);
     }
 
@@ -116,13 +154,43 @@ class NotaController extends Controller
         $request->validate([
             'notas_simuladas' => 'required|array',
         ]);
-        $tareas = Tarea::where('id_curso', $cursoId)->get();
-        $notas = Nota::whereIn('id_tarea', $tareas->pluck('id'))
-            ->where('id_estudiante', $estudianteId)
-            ->get();
-        $simuladas = collect($request->notas_simuladas);
-        $todas = $notas->pluck('nota')->merge($simuladas);
-        $promedio = $todas->avg();
+        $curso = Curso::with(['tareas.notas'])->findOrFail($cursoId);
+
+        $payload = collect($request->notas_simuladas);
+        $isObjectPayload = $payload->first() !== null && is_array($payload->first());
+
+        if (!$isObjectPayload) {
+            // Backward compatible: si solo llegan números, simulamos promedio simple.
+            $tareas = Tarea::where('id_curso', $cursoId)->get();
+            $notas = Nota::whereIn('id_tarea', $tareas->pluck('id'))
+                ->where('id_estudiante', $estudianteId)
+                ->get();
+            $todas = $notas->pluck('nota')->merge($payload);
+            return response()->json(['nota_final_simulada' => $todas->avg()]);
+        }
+
+        // Nuevo formato: [{ tarea_id, nota }]
+        $override = $payload
+            ->filter(fn ($x) => isset($x['tarea_id']) && isset($x['nota']))
+            ->mapWithKeys(fn ($x) => [(int) $x['tarea_id'] => (float) $x['nota']])
+            ->all();
+
+        foreach ($curso->tareas as $tarea) {
+            if (array_key_exists($tarea->id, $override)) {
+                $nota = $tarea->notas->where('id_estudiante', $estudianteId)->first();
+                if ($nota) {
+                    $nota->nota = $override[$tarea->id];
+                } else {
+                    $tarea->setRelation('notas', $tarea->notas->push(new Nota([
+                        'id_estudiante' => $estudianteId,
+                        'id_tarea' => $tarea->id,
+                        'nota' => $override[$tarea->id],
+                    ])));
+                }
+            }
+        }
+
+        $promedio = $this->calcularPromedioCursoParaEstudiante($curso, $estudianteId);
         return response()->json(['nota_final_simulada' => $promedio]);
     }
 

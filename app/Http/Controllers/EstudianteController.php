@@ -9,21 +9,42 @@ use App\Models\Nota;
 
 class EstudianteController extends Controller
 {
-    private function calcularPromedioPonderado($curso, int $estudianteId): float
+    private function calcularPromedioSegunMetodo(Curso $curso, int $estudianteId): float
     {
+        $metodo = $curso->metodo_calificacion ?: Curso::METODO_PONDERACION;
         $sumaNotas = 0;
-        $pesoTotal = 0;
+        $pesoTotal = 0.0;
+        $cantidad = 0;
 
         foreach ($curso->tareas as $tarea) {
             $notaRecord = $tarea->notas->where('id_estudiante', $estudianteId)->first();
             if ($notaRecord) {
-                $sumaNotas += $notaRecord->nota * ($tarea->porcentaje / 100);
-                $pesoTotal += $tarea->porcentaje;
+                $valor = (float) $notaRecord->nota;
+                if ($metodo === Curso::METODO_PROMEDIO) {
+                    $sumaNotas += $valor;
+                    $cantidad++;
+                } else {
+                    $p = (float) ($tarea->porcentaje ?? 0);
+                    if ($p > 0) {
+                        $sumaNotas += $valor * ($p / 100);
+                        $pesoTotal += $p;
+                    } else {
+                        $sumaNotas += $valor;
+                        $cantidad++;
+                    }
+                }
             }
         }
 
-        if ($pesoTotal <= 0) return 0;
-        return $sumaNotas / ($pesoTotal / 100);
+        if ($metodo === Curso::METODO_PROMEDIO) {
+            return $cantidad > 0 ? ($sumaNotas / $cantidad) : 0;
+        }
+
+        if ($pesoTotal > 0) {
+            return $sumaNotas / ($pesoTotal / 100);
+        }
+
+        return $cantidad > 0 ? ($sumaNotas / $cantidad) : 0;
     }
 
     /**
@@ -48,13 +69,27 @@ class EstudianteController extends Controller
         $tareasList = [];
         $sumaNotas = 0;
         $pesoTotal = 0;
+        $cantidad = 0;
+        $metodo = $curso->metodo_calificacion ?: Curso::METODO_PONDERACION;
 
         foreach ($curso->tareas as $tarea) {
             $notaRecord = $tarea->notas->where('id_estudiante', $id)->first();
             
             if ($notaRecord) {
-                $sumaNotas += $notaRecord->nota * ($tarea->porcentaje / 100);
-                $pesoTotal += $tarea->porcentaje;
+                $valor = (float) $notaRecord->nota;
+                if ($metodo === Curso::METODO_PROMEDIO) {
+                    $sumaNotas += $valor;
+                    $cantidad++;
+                } else {
+                    $p = (float) ($tarea->porcentaje ?? 0);
+                    if ($p > 0) {
+                        $sumaNotas += $valor * ($p / 100);
+                        $pesoTotal += $p;
+                    } else {
+                        $sumaNotas += $valor;
+                        $cantidad++;
+                    }
+                }
             }
 
             $tareasList[] = [
@@ -86,7 +121,11 @@ class EstudianteController extends Controller
             ];
         }
 
-        $promedio = $pesoTotal > 0 ? ($sumaNotas / ($pesoTotal / 100)) : 0;
+        if ($metodo === Curso::METODO_PROMEDIO) {
+            $promedio = $cantidad > 0 ? ($sumaNotas / $cantidad) : 0;
+        } else {
+            $promedio = $pesoTotal > 0 ? ($sumaNotas / ($pesoTotal / 100)) : ($cantidad > 0 ? ($sumaNotas / $cantidad) : 0);
+        }
         
         $estado = 'Normal';
         $riesgo = 'Bajo';
@@ -128,7 +167,7 @@ class EstudianteController extends Controller
 
         $promedios = [];
         foreach ($curso->inscripciones as $inscripcion) {
-            $prom = $this->calcularPromedioPonderado($curso, (int) $inscripcion->id_estudiante);
+            $prom = $this->calcularPromedioSegunMetodo($curso, (int) $inscripcion->id_estudiante);
             if ($prom > 0) {
                 $promedios[(int) $inscripcion->id_estudiante] = $prom;
             }

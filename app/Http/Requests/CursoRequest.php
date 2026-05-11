@@ -18,6 +18,9 @@ class CursoRequest extends FormRequest
             'descripcion' => 'nullable|string',
             'nota_minima' => 'required|numeric|min:0',
             'nota_maxima' => 'required|numeric|gt:nota_minima',
+            'metodo_calificacion' => 'sometimes|string|in:ponderacion,promedio',
+            'usa_asistencia' => 'sometimes|boolean',
+            'peso_asistencia' => 'nullable|numeric|min:0|max:100',
         ];
     }
 }
