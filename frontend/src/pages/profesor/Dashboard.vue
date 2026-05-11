@@ -6,7 +6,11 @@
         <h2 class="fw-bold m-0 text-dark">Hola, {{ userName }} <span class="wave-emoji">👋</span></h2>
         <p class="text-muted mt-1 fs-5">Semestre 2026-1</p>
       </div>
-      <button class="btn btn-primary-custom d-flex align-items-center gap-2 fw-bold px-4 py-2" @click="crearCurso">
+      <button
+        v-if="activeTab === 'cursos'"
+        class="btn btn-primary-custom d-flex align-items-center gap-2 fw-bold px-4 py-2"
+        @click="crearCurso"
+      >
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
         Crear curso
       </button>
@@ -17,92 +21,204 @@
       {{ error }}
     </div>
 
-    <div class="card border-0 shadow-sm rounded-4 p-3 mb-4">
-      <div class="row g-2 align-items-center">
-        <div class="col-md-8">
-          <input
-            v-model="searchQuery"
-            @keyup.enter="applyFilter"
-            type="text"
-            class="form-control custom-input"
-            placeholder="Filtrar cursos por nombre o descripcion..."
-          />
-        </div>
-        <div class="col-md-4 d-flex gap-2 justify-content-md-end">
-          <button class="btn btn-light border fw-medium" @click="clearFilter" :disabled="!searchQuery">Limpiar</button>
-          <button class="btn btn-primary-custom fw-bold" @click="applyFilter">Filtrar</button>
-        </div>
-      </div>
-    </div>
+    <!-- Tabs -->
+    <ul class="nav nav-pills mb-4">
+      <li class="nav-item">
+        <button class="nav-link" :class="{ active: activeTab === 'inicio' }" @click="activeTab = 'inicio'">
+          Inicio
+        </button>
+      </li>
+      <li class="nav-item">
+        <button class="nav-link" :class="{ active: activeTab === 'cursos' }" @click="activeTab = 'cursos'">
+          Cursos
+        </button>
+      </li>
+    </ul>
 
-    <!-- Loading State -->
-    <div v-if="loading" class="row">
-      <div class="col-md-4 mb-4" v-for="i in 3" :key="i">
-        <div class="card border-0 rounded-4 shadow-sm p-4 h-100 placeholder-glow">
-          <div class="placeholder col-8 mb-3 py-3 rounded"></div>
-          <div class="placeholder col-4 mb-2"></div>
-          <div class="placeholder col-6"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Empty State -->
-    <div v-else-if="cursos.length === 0" class="text-center py-5">
-      <div class="opacity-50 mb-3">
-        <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
-      </div>
-      <h4 class="text-muted fw-bold">Aún no tienes cursos</h4>
-      <p class="text-muted">Crea tu primer curso para empezar a gestionar calificaciones.</p>
-    </div>
-
-    <!-- Grid de Cursos (API Real) -->
-    <div v-else class="row g-4">
-      <div class="col-12 col-md-6 col-xl-4" v-for="(curso, index) in cursos" :key="curso.id">
-        <div class="card course-card border-0 shadow-sm h-100 overflow-hidden">
-          
-          <!-- Banner Superior del Card -->
-          <div class="course-banner text-white p-4 position-relative" :class="`banner-color-${index % 4}`">
-            <h4 class="fw-bold mb-1 position-relative z-1 text-truncate" :title="curso.nombre">{{ curso.nombre }}</h4>
-            <p class="opacity-75 m-0 position-relative z-1 text-truncate">{{ curso.descripcion || 'Sin descripción' }}</p>
-            
-            <!-- Patrón de fondo abstracto -->
-            <div class="abstract-pattern"></div>
-          </div>
-          
-          <!-- Info interna -->
-          <div class="card-body p-4 d-flex flex-column">
-            
-            <div class="d-flex justify-content-between align-items-center mb-3">
-              <div class="text-muted d-flex align-items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5.5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg>
-                <span class="fw-medium">Estudiantes: {{ curso.estudiantes_count !== undefined ? curso.estudiantes_count : '...' }}</span>
-              </div>
-              <div class="badge bg-light text-dark border px-2 py-1 fs-6">
-                Promedio: {{ curso.promedio_general !== undefined ? curso.promedio_general : 'N/A' }}
-              </div>
+    <!-- INICIO: Panel de información -->
+    <div v-if="activeTab === 'inicio'">
+      <div class="row g-4 mb-4">
+        <div class="col-12 col-md-4">
+          <div class="card border-0 shadow-sm rounded-4 p-4 h-100">
+            <div class="text-muted fw-medium small">Cursos</div>
+            <div class="d-flex align-items-end justify-content-between mt-2">
+              <div class="display-6 fw-bold">{{ totalCursos }}</div>
+              <button class="btn btn-sm btn-light border fw-medium" @click="activeTab = 'cursos'">Ver</button>
             </div>
-
-            <!-- Eliminado progreso estático -->
-
-            <div class="mt-auto d-flex gap-2">
-              <button class="btn btn-light flex-grow-1 border fw-medium action-btn" @click="abrirCurso(curso.id)">
-                Abrir curso
-              </button>
-              <button class="btn btn-light border px-3 action-btn text-muted" title="Planilla Rápida">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line><line x1="9" y1="9" x2="9" y2="21"></line><line x1="15" y1="9" x2="15" y2="21"></line></svg>
+            <div class="small text-muted mt-2">Total de cursos cargados en esta vista.</div>
+          </div>
+        </div>
+        <div class="col-12 col-md-4">
+          <div class="card border-0 shadow-sm rounded-4 p-4 h-100">
+            <div class="text-muted fw-medium small">Reclamos pendientes</div>
+            <div class="d-flex align-items-end justify-content-between mt-2">
+              <div class="display-6 fw-bold" :class="reclamosPendientesCount > 0 ? 'text-danger' : ''">
+                {{ reclamosPendientesCount }}
+              </div>
+              <button class="btn btn-sm btn-light border fw-medium" @click="activeTab = 'cursos'">Abrir cursos</button>
+            </div>
+            <div class="small text-muted mt-2">Suma de reclamos con estado “pendiente” (en tus cursos).</div>
+          </div>
+        </div>
+        <div class="col-12 col-md-4">
+          <div class="card border-0 shadow-sm rounded-4 p-4 h-100">
+            <div class="text-muted fw-medium small">Últimas calificaciones</div>
+            <div class="d-flex align-items-end justify-content-between mt-2">
+              <div class="display-6 fw-bold">{{ ultimasCalificaciones.length }}</div>
+              <button class="btn btn-sm btn-light border fw-medium" @click="refrescarPaneles" :disabled="loadingPaneles">
+                {{ loadingPaneles ? 'Actualizando...' : 'Actualizar' }}
               </button>
             </div>
+            <div class="small text-muted mt-2">Registros recientes detectados por fecha de actualización.</div>
           </div>
-          
+        </div>
+      </div>
+
+      <div class="row g-4">
+        <div class="col-12 col-lg-7">
+          <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+            <div class="card-header bg-white border-bottom p-4 d-flex justify-content-between align-items-center">
+              <div>
+                <div class="fw-bold">Últimas tareas calificadas</div>
+                <div class="text-muted small">Basado en notas (`updated_at`) de tus cursos.</div>
+              </div>
+              <button class="btn btn-sm btn-light border fw-medium" @click="refrescarPaneles" :disabled="loadingPaneles">
+                {{ loadingPaneles ? 'Cargando...' : 'Recargar' }}
+              </button>
+            </div>
+            <div class="card-body p-0">
+              <div v-if="loadingPaneles" class="p-4 text-muted">Cargando actividad...</div>
+              <div v-else-if="ultimasCalificaciones.length === 0" class="p-4 text-muted">
+                Aún no hay calificaciones registradas.
+              </div>
+              <ul v-else class="list-group list-group-flush">
+                <li v-for="(it, idx) in ultimasCalificaciones" :key="idx" class="list-group-item d-flex justify-content-between align-items-center py-3 px-4">
+                  <div class="me-3">
+                    <div class="fw-bold text-dark text-truncate" :title="`${it.curso} · ${it.tarea}`">{{ it.curso }} · {{ it.tarea }}</div>
+                    <div class="small text-muted">{{ formatDateTime(it.updated_at) }}</div>
+                  </div>
+                  <div class="fw-bold" :class="getNotaClass(it.nota)">{{ Number(it.nota).toFixed(1) }}</div>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 col-lg-5">
+          <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+            <div class="card-header bg-white border-bottom p-4">
+              <div class="fw-bold">Reclamos pendientes</div>
+              <div class="text-muted small">Los más recientes (estado “pendiente”).</div>
+            </div>
+            <div class="card-body p-0">
+              <div v-if="loadingPaneles" class="p-4 text-muted">Cargando reclamos...</div>
+              <div v-else-if="reclamosPendientes.length === 0" class="p-4 text-muted">
+                No tienes reclamos pendientes.
+              </div>
+              <ul v-else class="list-group list-group-flush">
+                <li v-for="r in reclamosPendientes" :key="r.id" class="list-group-item py-3 px-4">
+                  <div class="d-flex justify-content-between gap-3">
+                    <div class="text-truncate">
+                      <div class="fw-bold text-dark text-truncate" :title="r.titulo">{{ r.titulo }}</div>
+                      <div class="small text-muted text-truncate" :title="r.mensaje">{{ r.mensaje }}</div>
+                    </div>
+                    <div class="small text-muted text-nowrap">{{ formatDateTime(r.created_at) }}</div>
+                  </div>
+                </li>
+              </ul>
+            </div>
+          </div>
         </div>
       </div>
     </div>
-    <div v-if="!loading && cursos.length > 0" class="d-flex justify-content-between align-items-center mt-4">
-      <small class="text-muted">Mostrando {{ cursos.length }} de {{ totalCursos }} cursos</small>
-      <div class="d-flex align-items-center gap-2">
-        <button class="btn btn-sm btn-light border" @click="goToPage(currentPage - 1)" :disabled="currentPage <= 1">Anterior</button>
-        <span class="small text-muted">Pagina {{ currentPage }} de {{ lastPage }}</span>
-        <button class="btn btn-sm btn-light border" @click="goToPage(currentPage + 1)" :disabled="currentPage >= lastPage">Siguiente</button>
+
+    <!-- CURSOS: lo que estaba antes -->
+    <div v-else>
+      <div class="card border-0 shadow-sm rounded-4 p-3 mb-4">
+        <div class="row g-2 align-items-center">
+          <div class="col-md-8">
+            <input
+              v-model="searchQuery"
+              @keyup.enter="applyFilter"
+              type="text"
+              class="form-control custom-input"
+              placeholder="Filtrar cursos por nombre o descripcion..."
+            />
+          </div>
+          <div class="col-md-4 d-flex gap-2 justify-content-md-end">
+            <button class="btn btn-light border fw-medium" @click="clearFilter" :disabled="!searchQuery">Limpiar</button>
+            <button class="btn btn-primary-custom fw-bold" @click="applyFilter">Filtrar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Loading State -->
+      <div v-if="loading" class="row">
+        <div class="col-md-4 mb-4" v-for="i in 3" :key="i">
+          <div class="card border-0 rounded-4 shadow-sm p-4 h-100 placeholder-glow">
+            <div class="placeholder col-8 mb-3 py-3 rounded"></div>
+            <div class="placeholder col-4 mb-2"></div>
+            <div class="placeholder col-6"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Empty State -->
+      <div v-else-if="cursos.length === 0" class="text-center py-5">
+        <div class="opacity-50 mb-3">
+          <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+        </div>
+        <h4 class="text-muted fw-bold">Aún no tienes cursos</h4>
+        <p class="text-muted">Crea tu primer curso para empezar a gestionar calificaciones.</p>
+      </div>
+
+      <!-- Grid de Cursos (API Real) -->
+      <div v-else class="row g-4">
+        <div class="col-12 col-md-6 col-xl-4" v-for="(curso, index) in cursos" :key="curso.id">
+          <div class="card course-card border-0 shadow-sm h-100 overflow-hidden">
+            
+            <!-- Banner Superior del Card -->
+            <div class="course-banner text-white p-4 position-relative" :class="`banner-color-${index % 4}`">
+              <h4 class="fw-bold mb-1 position-relative z-1 text-truncate" :title="curso.nombre">{{ curso.nombre }}</h4>
+              <p class="opacity-75 m-0 position-relative z-1 text-truncate">{{ curso.descripcion || 'Sin descripción' }}</p>
+              
+              <!-- Patrón de fondo abstracto -->
+              <div class="abstract-pattern"></div>
+            </div>
+            
+            <!-- Info interna -->
+            <div class="card-body p-4 d-flex flex-column">
+              
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <div class="text-muted d-flex align-items-center gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5.5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg>
+                  <span class="fw-medium">Estudiantes: {{ curso.estudiantes_count !== undefined ? curso.estudiantes_count : '...' }}</span>
+                </div>
+                <div class="badge bg-light text-dark border px-2 py-1 fs-6">
+                  Promedio: {{ curso.promedio_general !== undefined ? curso.promedio_general : 'N/A' }}
+                </div>
+              </div>
+              
+              <div class="mt-auto d-flex gap-2">
+                <button class="btn btn-light flex-grow-1 border fw-medium action-btn" @click="abrirCurso(curso.id)">
+                  Abrir curso
+                </button>
+                <button class="btn btn-light border px-3 action-btn text-muted" title="Planilla Rápida">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line><line x1="9" y1="9" x2="9" y2="21"></line><line x1="15" y1="9" x2="15" y2="21"></line></svg>
+                </button>
+              </div>
+            </div>
+            
+          </div>
+        </div>
+      </div>
+      <div v-if="!loading && cursos.length > 0" class="d-flex justify-content-between align-items-center mt-4">
+        <small class="text-muted">Mostrando {{ cursos.length }} de {{ totalCursos }} cursos</small>
+        <div class="d-flex align-items-center gap-2">
+          <button class="btn btn-sm btn-light border" @click="goToPage(currentPage - 1)" :disabled="currentPage <= 1">Anterior</button>
+          <span class="small text-muted">Pagina {{ currentPage }} de {{ lastPage }}</span>
+          <button class="btn btn-sm btn-light border" @click="goToPage(currentPage + 1)" :disabled="currentPage >= lastPage">Siguiente</button>
+        </div>
       </div>
     </div>
     <!-- Formulario Modal para Crear Curso (Overlay) -->
@@ -175,6 +291,14 @@ const currentPage = ref(1)
 const lastPage = ref(1)
 const totalCursos = ref(0)
 
+const activeTab = ref('inicio')
+
+// Panel "Inicio"
+const loadingPaneles = ref(false)
+const ultimasCalificaciones = ref([])
+const reclamosPendientes = ref([])
+const reclamosPendientesCount = ref(0)
+
 // Form state
 const showCreateModal = ref(false)
 const savingCurso = ref(false)
@@ -196,6 +320,7 @@ onMounted(async () => {
   }
 
   await loadCursos()
+  await refrescarPaneles()
 })
 
 async function loadCursos(page = 1) {
@@ -221,6 +346,60 @@ async function loadCursos(page = 1) {
   }
 }
 
+async function refrescarPaneles() {
+  loadingPaneles.value = true
+  try {
+    const ids = (cursos.value || []).map(c => c.id).filter(Boolean)
+    if (ids.length === 0) {
+      ultimasCalificaciones.value = []
+      reclamosPendientes.value = []
+      reclamosPendientesCount.value = 0
+      return
+    }
+
+    // Últimas calificaciones: se infiere desde /tareas/curso/{id} (incluye notas con updated_at)
+    const tareasPorCurso = await Promise.all(ids.map(id => apiRequest(`/api/tareas/curso/${id}`)))
+    const flat = []
+    tareasPorCurso.forEach((tareas, i) => {
+      const cursoNombre = cursos.value[i]?.nombre || `Curso ${ids[i]}`
+      ;(tareas || []).forEach(t => {
+        ;(t.notas || []).forEach(n => {
+          flat.push({
+            curso: cursoNombre,
+            tarea: t.nombre || `Tarea ${t.id}`,
+            nota: Number(n.nota),
+            updated_at: n.updated_at,
+          })
+        })
+      })
+    })
+    flat.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+    ultimasCalificaciones.value = flat.slice(0, 8)
+
+    // Reclamos pendientes: suma por curso
+    const reclamosPorCurso = await Promise.all(ids.map(id => apiRequest(`/api/reclamos/curso/${id}`)))
+    const reclamosFlat = reclamosPorCurso.flatMap((recs, idx) => {
+      const cursoNombre = cursos.value[idx]?.nombre || `Curso ${ids[idx]}`
+      return (recs || []).map(r => ({
+        id: r.id,
+        estado: r.estado,
+        created_at: r.created_at,
+        mensaje: r.mensaje,
+        titulo: `${cursoNombre} · ${(r?.nota?.tarea?.nombre) || 'Tarea'} · ${(r?.estudiante?.nombre) || 'Estudiante'}`,
+      }))
+    })
+    const pendientes = reclamosFlat.filter(r => String(r.estado || '').toLowerCase() === 'pendiente')
+    pendientes.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    reclamosPendientesCount.value = pendientes.length
+    reclamosPendientes.value = pendientes.slice(0, 6)
+  } catch (e) {
+    // No bloquea la vista "Cursos"
+    console.warn('No se pudieron cargar paneles del dashboard', e)
+  } finally {
+    loadingPaneles.value = false
+  }
+}
+
 function crearCurso() {
   newCurso.value = { nombre: '', descripcion: '', nota_minima: 3.0, nota_maxima: 5.0, metodo_calificacion: 'ponderacion' }
   showCreateModal.value = true
@@ -231,6 +410,7 @@ async function guardarNuevoCurso() {
   try {
     await apiRequest('/api/cursos', 'POST', newCurso.value)
     await loadCursos(1)
+    await refrescarPaneles()
     showCreateModal.value = false
   } catch (e) {
     alert('Error al crear el curso: ' + e.message)
@@ -255,6 +435,21 @@ function clearFilter() {
 function goToPage(page) {
   if (page < 1 || page > lastPage.value) return
   loadCursos(page)
+}
+
+function formatDateTime(value) {
+  if (!value) return ''
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return String(value)
+  return d.toLocaleString('es-CO', { year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+}
+
+function getNotaClass(nota) {
+  const v = Number(nota)
+  if (Number.isNaN(v)) return 'text-muted'
+  if (v >= 4.0) return 'text-success'
+  if (v >= 3.0) return 'text-warning'
+  return 'text-danger'
 }
 </script>
 
