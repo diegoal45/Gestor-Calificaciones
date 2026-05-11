@@ -10,7 +10,7 @@
       </div>
       
       <nav class="flex-grow-1 p-3">
-        <div class="text-muted small fw-bold mb-3 px-3">Profesor</div>
+        <div class="text-muted small fw-bold mb-3 px-3 text-capitalize">{{ userRoleLabel }}</div>
         
         <router-link
           :to="dashboardInicioPath"
@@ -87,17 +87,23 @@ const router = useRouter()
 const route = useRoute()
 const userName = ref('')
 const userRole = ref('')
+const userRoleLabel = computed(() => {
+  const r = String(userRole.value || '').toLowerCase()
+  if (r === 'estudiante') return 'Estudiante'
+  if (r === 'profesor') return 'Profesor'
+  return 'Usuario'
+})
 /** Rutas con nombre para que el query `tab` dispare navegación real al hacer clic en Cursos. */
 const dashboardInicioPath = ref({ name: 'Dashboard' })
 const cursosPath = ref({ name: 'Dashboard', query: { tab: 'cursos' } })
 
 const sidebarInicioActivo = computed(() => {
-  if (route.name !== 'Dashboard') return false
+  if (route.name !== 'Dashboard' && route.name !== 'DashboardEstudiante') return false
   return route.query.tab !== 'cursos'
 })
 
 const sidebarCursosActivo = computed(() => {
-  if (route.name !== 'Dashboard') return false
+  if (route.name !== 'Dashboard' && route.name !== 'DashboardEstudiante') return false
   return route.query.tab === 'cursos'
 })
 
@@ -109,7 +115,7 @@ onMounted(() => {
       userRole.value = user.rol || 'Rol'
       if (user.rol === 'estudiante') {
         dashboardInicioPath.value = { name: 'DashboardEstudiante' }
-        cursosPath.value = { name: 'DashboardEstudiante' }
+        cursosPath.value = { name: 'DashboardEstudiante', query: { tab: 'cursos' } }
       } else {
         dashboardInicioPath.value = { name: 'Dashboard' }
         cursosPath.value = { name: 'Dashboard', query: { tab: 'cursos' } }

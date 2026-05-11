@@ -271,6 +271,9 @@ const notaConAsistencia = computed(() => {
 })
 
 onMounted(async () => {
+  const qtab = String(route.query?.tab || '').toLowerCase()
+  if (qtab === 'reclamos') activeTab.value = 'Reclamos'
+
   try {
     const user = JSON.parse(localStorage.getItem('user'))
     if (!user?.id) throw new Error('Usuario no encontrado en sesion')
