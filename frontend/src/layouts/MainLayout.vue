@@ -17,10 +17,10 @@
           <span class="d-none d-md-inline ms-3 fw-medium">Dashboard</span>
         </router-link>
         
-        <a href="#" class="nav-item-custom mb-2 text-muted text-decoration-none">
+        <router-link :to="cursosPath" class="nav-item-custom mb-2 text-muted text-decoration-none">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
           <span class="d-none d-md-inline ms-3 fw-medium">Cursos</span>
-        </a>
+        </router-link>
       </nav>
       
       <div class="p-3 border-top mt-auto">
@@ -87,6 +87,7 @@ const router = useRouter()
 const userName = ref('')
 const userRole = ref('')
 const dashboardPath = ref('/dashboard')
+const cursosPath = ref({ path: '/dashboard', query: { tab: 'cursos' } })
 
 onMounted(() => {
   try {
@@ -95,6 +96,9 @@ onMounted(() => {
       userName.value = user.nombre || 'Usuario'
       userRole.value = user.rol || 'Rol'
       dashboardPath.value = user.rol === 'estudiante' ? '/estudiante/dashboard' : '/dashboard'
+      cursosPath.value = user.rol === 'estudiante'
+        ? '/estudiante/dashboard'
+        : ({ path: '/dashboard', query: { tab: 'cursos' } })
     }
   } catch (e) {
     userName.value = 'Usuario'

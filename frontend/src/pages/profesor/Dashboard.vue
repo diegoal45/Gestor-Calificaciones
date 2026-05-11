@@ -107,8 +107,15 @@
         <div class="col-12 col-lg-5">
           <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
             <div class="card-header bg-white border-bottom p-4">
-              <div class="fw-bold">Reclamos pendientes</div>
-              <div class="text-muted small">Los más recientes (estado “pendiente”).</div>
+              <div class="d-flex justify-content-between align-items-start gap-3">
+                <div>
+                  <div class="fw-bold">Reclamos pendientes</div>
+                  <div class="text-muted small">Los más recientes (estado “pendiente”).</div>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-primary fw-medium" @click="irAReclamos" :disabled="loadingPaneles || !cursoDestinoReclamos">
+                  Ir a Reclamos
+                </button>
+              </div>
             </div>
             <div class="card-body p-0">
               <div v-if="loadingPaneles" class="p-4 text-muted">Cargando reclamos...</div>
@@ -277,11 +284,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { apiRequest } from '../../api.js'
 
 const router = useRouter()
+const route = useRoute()
 const userName = ref('')
 const cursos = ref([])
 const loading = ref(true)
@@ -298,6 +306,7 @@ const loadingPaneles = ref(false)
 const ultimasCalificaciones = ref([])
 const reclamosPendientes = ref([])
 const reclamosPendientesCount = ref(0)
+const cursoDestinoReclamos = ref(null)
 
 // Form state
 const showCreateModal = ref(false)
@@ -320,8 +329,20 @@ onMounted(async () => {
   }
 
   await loadCursos()
+  // Soporta navegación directa desde sidebar: /dashboard?tab=cursos
+  if (route.query?.tab === 'cursos') {
+    activeTab.value = 'cursos'
+  }
   await refrescarPaneles()
 })
+
+watch(
+  () => route.query?.tab,
+  (tab) => {
+    if (tab === 'cursos') activeTab.value = 'cursos'
+    if (tab === 'inicio') activeTab.value = 'inicio'
+  }
+)
 
 async function loadCursos(page = 1) {
   loading.value = true
@@ -365,6 +386,7 @@ async function refrescarPaneles() {
       ;(tareas || []).forEach(t => {
         ;(t.notas || []).forEach(n => {
           flat.push({
+            curso_id: ids[i],
             curso: cursoNombre,
             tarea: t.nombre || `Tarea ${t.id}`,
             nota: Number(n.nota),
@@ -382,6 +404,7 @@ async function refrescarPaneles() {
       const cursoNombre = cursos.value[idx]?.nombre || `Curso ${ids[idx]}`
       return (recs || []).map(r => ({
         id: r.id,
+        curso_id: ids[idx],
         estado: r.estado,
         created_at: r.created_at,
         mensaje: r.mensaje,
@@ -392,12 +415,22 @@ async function refrescarPaneles() {
     pendientes.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     reclamosPendientesCount.value = pendientes.length
     reclamosPendientes.value = pendientes.slice(0, 6)
+    cursoDestinoReclamos.value = (pendientes[0]?.curso_id) || ids[0] || null
   } catch (e) {
     // No bloquea la vista "Cursos"
     console.warn('No se pudieron cargar paneles del dashboard', e)
   } finally {
     loadingPaneles.value = false
   }
+}
+
+function irAReclamos() {
+  const cid = cursoDestinoReclamos.value
+  if (!cid) {
+    activeTab.value = 'cursos'
+    return
+  }
+  router.push(`/curso/${cid}/reclamos`)
 }
 
 function crearCurso() {

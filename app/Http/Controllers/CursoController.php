@@ -823,7 +823,7 @@ class CursoController extends Controller
         foreach ($curso->tareas as $tarea) {
             $promedioTarea = $tarea->notas->avg('nota') ?? 0;
             $rendimiento = [
-                'nombre' => $tarea->titulo,
+                'nombre' => $tarea->nombre,
                 'promedio' => round($promedioTarea, 2)
             ];
             $rendimientoTareas[] = $rendimiento;

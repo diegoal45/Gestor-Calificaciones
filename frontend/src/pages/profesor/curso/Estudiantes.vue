@@ -49,7 +49,7 @@
                     <div class="fw-bold text-dark">{{ estudiante.nombre }}</div>
                   </div>
                 </td>
-                <td class="py-3 text-muted small">{{ estudiante.correo }}</td>
+                <td class="py-3 text-muted small">{{ estudiante.email || '-' }}</td>
                 <td class="py-3"><span class="badge bg-light text-dark border">{{ estudiante.grupo }}</span></td>
                 <td class="py-3 text-center fw-bold" :class="getGradeTextColor(estudiante.promedio)">
                   {{ estudiante.promedio || '-' }}
@@ -82,7 +82,7 @@
             {{ selectedEstudiante.nombre.charAt(0) }}
           </div>
           <h4 class="fw-bold mb-0">{{ selectedEstudiante.nombre }}</h4>
-          <p class="opacity-75 small m-0">{{ selectedEstudiante.correo }}</p>
+          <p class="opacity-75 small m-0">{{ selectedEstudiante.email || '-' }}</p>
         </div>
         <div class="abstract-pattern"></div>
       </div>
@@ -145,6 +145,7 @@ const route = useRoute()
 const cursoId = route.params.id
 
 const loading = ref(true)
+const error = ref('')
 const estudiantes = ref([])
 const searchQuery = ref('')
 
@@ -172,7 +173,10 @@ async function loadEstudiantes() {
 const filteredEstudiantes = computed(() => {
   if (!searchQuery.value) return estudiantes.value
   const q = searchQuery.value.toLowerCase()
-  return estudiantes.value.filter(e => e.nombre.toLowerCase().includes(q) || e.correo.toLowerCase().includes(q))
+  return estudiantes.value.filter(e =>
+    (e.nombre || '').toLowerCase().includes(q) ||
+    (e.email || '').toLowerCase().includes(q)
+  )
 })
 
 async function abrirPerfil(est) {
@@ -182,15 +186,11 @@ async function abrirPerfil(est) {
     const res = await apiRequest(`/api/estudiantes/${est.id}/perfil?curso_id=${cursoId}`)
     selectedEstudiante.value.tareas = res.tareas || []
   } catch(e) {
-    // Mock tareas for profile
-    setTimeout(() => {
-      selectedEstudiante.value.tareas = [
-        { id: 1, nombre: 'Parcial 1', nota: (parseFloat(est.promedio) - 0.2).toFixed(1), feedback: 'Buen trabajo en la sección práctica.' },
-        { id: 2, nombre: 'Taller Grupal', nota: est.promedio, feedback: '' },
-        { id: 3, nombre: 'Ensayo', nota: (parseFloat(est.promedio) + 0.1).toFixed(1), feedback: 'Faltó profundizar en las conclusiones.' }
-      ]
-      loadingPerfil.value = false
-    }, 500)
+    console.error('Error cargando perfil', e)
+    selectedEstudiante.value.tareas = []
+    error.value = 'No se pudo cargar el historial de tareas: ' + e.message
+  } finally {
+    loadingPerfil.value = false
   }
 }
 
