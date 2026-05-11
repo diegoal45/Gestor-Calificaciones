@@ -24,12 +24,12 @@
     <!-- Tabs -->
     <ul class="nav nav-pills mb-4">
       <li class="nav-item">
-        <button class="nav-link" :class="{ active: activeTab === 'inicio' }" @click="activeTab = 'inicio'">
+        <button type="button" class="nav-link" :class="{ active: activeTab === 'inicio' }" @click="irATab('inicio')">
           Inicio
         </button>
       </li>
       <li class="nav-item">
-        <button class="nav-link" :class="{ active: activeTab === 'cursos' }" @click="activeTab = 'cursos'">
+        <button type="button" class="nav-link" :class="{ active: activeTab === 'cursos' }" @click="irATab('cursos')">
           Cursos
         </button>
       </li>
@@ -43,7 +43,7 @@
             <div class="text-muted fw-medium small">Cursos</div>
             <div class="d-flex align-items-end justify-content-between mt-2">
               <div class="display-6 fw-bold">{{ totalCursos }}</div>
-              <button class="btn btn-sm btn-light border fw-medium" @click="activeTab = 'cursos'">Ver</button>
+              <button type="button" class="btn btn-sm btn-light border fw-medium" @click="irATab('cursos')">Ver</button>
             </div>
             <div class="small text-muted mt-2">Total de cursos cargados en esta vista.</div>
           </div>
@@ -55,7 +55,7 @@
               <div class="display-6 fw-bold" :class="reclamosPendientesCount > 0 ? 'text-danger' : ''">
                 {{ reclamosPendientesCount }}
               </div>
-              <button class="btn btn-sm btn-light border fw-medium" @click="activeTab = 'cursos'">Abrir cursos</button>
+              <button type="button" class="btn btn-sm btn-light border fw-medium" @click="irATab('cursos')">Abrir cursos</button>
             </div>
             <div class="small text-muted mt-2">Suma de reclamos con estado “pendiente” (en tus cursos).</div>
           </div>
@@ -329,20 +329,29 @@ onMounted(async () => {
   }
 
   await loadCursos()
-  // Soporta navegación directa desde sidebar: /dashboard?tab=cursos
-  if (route.query?.tab === 'cursos') {
-    activeTab.value = 'cursos'
-  }
+  sincronizarTabDesdeRuta()
   await refrescarPaneles()
 })
 
 watch(
-  () => route.query?.tab,
-  (tab) => {
-    if (tab === 'cursos') activeTab.value = 'cursos'
-    if (tab === 'inicio') activeTab.value = 'inicio'
+  () => route.query.tab,
+  () => {
+    sincronizarTabDesdeRuta()
   }
 )
+
+function sincronizarTabDesdeRuta() {
+  activeTab.value = route.query.tab === 'cursos' ? 'cursos' : 'inicio'
+}
+
+function irATab(tab) {
+  activeTab.value = tab
+  if (tab === 'cursos') {
+    router.replace({ name: 'Dashboard', query: { tab: 'cursos' } })
+  } else {
+    router.replace({ name: 'Dashboard' })
+  }
+}
 
 async function loadCursos(page = 1) {
   loading.value = true
@@ -375,6 +384,7 @@ async function refrescarPaneles() {
       ultimasCalificaciones.value = []
       reclamosPendientes.value = []
       reclamosPendientesCount.value = 0
+      cursoDestinoReclamos.value = null
       return
     }
 
@@ -427,7 +437,7 @@ async function refrescarPaneles() {
 function irAReclamos() {
   const cid = cursoDestinoReclamos.value
   if (!cid) {
-    activeTab.value = 'cursos'
+    irATab('cursos')
     return
   }
   router.push(`/curso/${cid}/reclamos`)

@@ -12,12 +12,20 @@
       <nav class="flex-grow-1 p-3">
         <div class="text-muted small fw-bold mb-3 px-3">Profesor</div>
         
-        <router-link :to="dashboardPath" class="nav-item-custom active mb-2">
+        <router-link
+          :to="dashboardInicioPath"
+          class="nav-item-custom mb-2 text-decoration-none"
+          :class="{ active: sidebarInicioActivo }"
+        >
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
           <span class="d-none d-md-inline ms-3 fw-medium">Dashboard</span>
         </router-link>
         
-        <router-link :to="cursosPath" class="nav-item-custom mb-2 text-muted text-decoration-none">
+        <router-link
+          :to="cursosPath"
+          class="nav-item-custom mb-2 text-decoration-none"
+          :class="{ active: sidebarCursosActivo }"
+        >
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
           <span class="d-none d-md-inline ms-3 fw-medium">Cursos</span>
         </router-link>
@@ -49,14 +57,6 @@
             <input type="text" class="form-control search-input" placeholder="Buscar curso...">
           </div>
           
-          <!-- Notificaciones -->
-          <button class="btn btn-light position-relative rounded-circle p-2 border-0">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
-            <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle">
-              <span class="visually-hidden">Nuevas alertas</span>
-            </span>
-          </button>
-          
           <!-- Perfil User (Leído dinámicamente) -->
           <div class="d-flex align-items-center gap-3 border-start ps-4">
             <div class="text-end d-none d-sm-block">
@@ -79,15 +79,27 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { apiRequest } from '../api.js'
 
 const router = useRouter()
+const route = useRoute()
 const userName = ref('')
 const userRole = ref('')
-const dashboardPath = ref('/dashboard')
-const cursosPath = ref({ path: '/dashboard', query: { tab: 'cursos' } })
+/** Rutas con nombre para que el query `tab` dispare navegación real al hacer clic en Cursos. */
+const dashboardInicioPath = ref({ name: 'Dashboard' })
+const cursosPath = ref({ name: 'Dashboard', query: { tab: 'cursos' } })
+
+const sidebarInicioActivo = computed(() => {
+  if (route.name !== 'Dashboard') return false
+  return route.query.tab !== 'cursos'
+})
+
+const sidebarCursosActivo = computed(() => {
+  if (route.name !== 'Dashboard') return false
+  return route.query.tab === 'cursos'
+})
 
 onMounted(() => {
   try {
@@ -95,10 +107,13 @@ onMounted(() => {
     if (user) {
       userName.value = user.nombre || 'Usuario'
       userRole.value = user.rol || 'Rol'
-      dashboardPath.value = user.rol === 'estudiante' ? '/estudiante/dashboard' : '/dashboard'
-      cursosPath.value = user.rol === 'estudiante'
-        ? '/estudiante/dashboard'
-        : ({ path: '/dashboard', query: { tab: 'cursos' } })
+      if (user.rol === 'estudiante') {
+        dashboardInicioPath.value = { name: 'DashboardEstudiante' }
+        cursosPath.value = { name: 'DashboardEstudiante' }
+      } else {
+        dashboardInicioPath.value = { name: 'Dashboard' }
+        cursosPath.value = { name: 'Dashboard', query: { tab: 'cursos' } }
+      }
     }
   } catch (e) {
     userName.value = 'Usuario'

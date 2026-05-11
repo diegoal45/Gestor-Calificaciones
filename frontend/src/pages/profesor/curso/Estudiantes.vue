@@ -2,6 +2,7 @@
   <div class="estudiantes-container d-flex h-100 position-relative overflow-hidden">
     <!-- Contenido Principal: Tabla de Estudiantes -->
     <div class="flex-grow-1 d-flex flex-column transition-all" :class="{'pe-4 me-4 border-end': selectedEstudiante}" style="transition: all 0.3s ease;">
+      <div v-if="error" class="alert alert-danger mb-3" role="alert">{{ error }}</div>
       <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
           <h4 class="fw-bold mb-1">Directorio de Estudiantes</h4>
@@ -109,8 +110,25 @@
         <div v-if="loadingPerfil" class="text-center py-4">
           <div class="spinner-border spinner-border-sm text-primary"></div>
         </div>
+
+        <div v-else-if="perfilError" class="alert alert-warning border-0 small mb-3">
+          {{ perfilError }}
+        </div>
+
+        <div
+          v-else-if="!(selectedEstudiante.tareas && selectedEstudiante.tareas.length)"
+          class="text-center py-4 px-3 rounded-3 bg-light border border-light text-muted small"
+        >
+          No hay tareas registradas en este curso todavía, o no se pudo cargar el listado.
+        </div>
         
         <div v-else class="task-timeline">
+          <div
+            v-if="!tieneAlgunaCalificacion"
+            class="alert alert-light border small mb-3 py-2 m-0"
+          >
+            Aún no hay tareas calificadas para este estudiante. Las evaluaciones aparecerán con nota cuando las registres en planilla o calificar.
+          </div>
           <div v-for="tarea in selectedEstudiante.tareas" :key="tarea.id" class="timeline-item pb-4 position-relative">
             <div class="timeline-dot position-absolute bg-white border border-2 rounded-circle" :class="`border-${getGradeColorWord(tarea.nota)}`"></div>
             <div class="ms-4 card border border-light-subtle shadow-sm">
@@ -146,6 +164,7 @@ const cursoId = route.params.id
 
 const loading = ref(true)
 const error = ref('')
+const perfilError = ref('')
 const estudiantes = ref([])
 const searchQuery = ref('')
 
@@ -160,6 +179,7 @@ onMounted(async () => {
 async function loadEstudiantes() {
   loading.value = true
   try {
+    error.value = ''
     const res = await apiRequest(`/api/cursos/${cursoId}/estudiantes`)
     estudiantes.value = res || []
   } catch (e) {
@@ -179,16 +199,28 @@ const filteredEstudiantes = computed(() => {
   )
 })
 
+const tieneAlgunaCalificacion = computed(() => {
+  const tareas = selectedEstudiante.value?.tareas
+  if (!tareas || !tareas.length) return false
+  return tareas.some(t => {
+    const n = t.nota
+    if (n === null || n === undefined || n === '') return false
+    const num = parseFloat(n)
+    return !Number.isNaN(num)
+  })
+})
+
 async function abrirPerfil(est) {
-  selectedEstudiante.value = est
+  selectedEstudiante.value = { ...est, tareas: [] }
   loadingPerfil.value = true
+  perfilError.value = ''
   try {
     const res = await apiRequest(`/api/estudiantes/${est.id}/perfil?curso_id=${cursoId}`)
     selectedEstudiante.value.tareas = res.tareas || []
   } catch(e) {
     console.error('Error cargando perfil', e)
     selectedEstudiante.value.tareas = []
-    error.value = 'No se pudo cargar el historial de tareas: ' + e.message
+    perfilError.value = 'No se pudo cargar el historial de tareas: ' + e.message
   } finally {
     loadingPerfil.value = false
   }
@@ -196,6 +228,7 @@ async function abrirPerfil(est) {
 
 function cerrarPerfil() {
   selectedEstudiante.value = null
+  perfilError.value = ''
 }
 
 // Utils
