@@ -459,6 +459,7 @@ function getEstadoClass(promedio) {
   100% { transform: rotate( 0.0deg) }
 }
 
+/* Course cards responsive */
 .course-card {
   border-radius: 16px;
   transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
@@ -466,6 +467,13 @@ function getEstadoClass(promedio) {
 .course-card:hover {
   transform: translateY(-5px);
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1) !important;
+}
+
+@media (max-width: 768px) {
+  .course-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1) !important;
+  }
 }
 .course-banner {
   min-height: 120px;
@@ -513,10 +521,56 @@ function getEstadoClass(promedio) {
   border-radius: 10px;
   transition: all 0.2s ease;
 }
-.action-btn:hover {
-  background-color: #f1f5f9;
-  border-color: #cbd5e1 !important;
+/* Header responsive */
+@media (max-width: 768px) {
+  .d-flex.justify-content-between.align-items-center.mb-5 {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  
+  .d-flex.gap-2 {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  
+  .btn {
+    font-size: 0.875rem;
+    padding: 0.5rem 1rem;
+  }
 }
+
+@media (max-width: 576px) {
+  .d-flex.justify-content-between.align-items-center.mb-5 h2 {
+    font-size: 1.5rem;
+  }
+  
+  .d-flex.gap-2 {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .btn {
+    width: 100%;
+  }
+}
+
+/* Tabs responsive */
+@media (max-width: 576px) {
+  .nav.nav-pills {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .nav.nav-pills .nav-item {
+    width: 100%;
+  }
+  
+  .nav.nav-pills .nav-link {
+    text-align: center;
+  }
+}
+/* Modal responsive */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -524,8 +578,17 @@ function getEstadoClass(promedio) {
   backdrop-filter: blur(2px);
   z-index: 1050;
 }
+
 .modal-card {
   width: 100%;
   max-width: 460px;
+  margin: 1rem;
+}
+
+@media (max-width: 576px) {
+  .modal-card {
+    max-width: 95%;
+    margin: 0.5rem;
+  }
 }
 </style>

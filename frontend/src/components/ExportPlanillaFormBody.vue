@@ -76,6 +76,16 @@
             />
             <label class="form-check-label" for="exp-asist">Porcentaje de asistencia</label>
           </div>
+          <div class="form-check">
+            <input
+              class="form-check-input"
+              type="checkbox"
+              id="exp-feedback"
+              :checked="incluirFeedback"
+              @change="$emit('update:incluirFeedback', $event.target.checked)"
+            />
+            <label class="form-check-label" for="exp-feedback">Feedback de tareas</label>
+          </div>
         </div>
       </div>
 
@@ -150,6 +160,7 @@ defineProps({
   incluirEmail: { type: Boolean, default: false },
   incluirGrupo: { type: Boolean, default: false },
   incluirAsistenciaPct: { type: Boolean, default: false },
+  incluirFeedback: { type: Boolean, default: false },
   filtroRiesgo: { type: String, default: 'todos' },
   tareasChecks: { type: Object, required: true },
   canExport: { type: Boolean, default: false },
@@ -162,6 +173,7 @@ const emit = defineEmits([
   'update:incluirEmail',
   'update:incluirGrupo',
   'update:incluirAsistenciaPct',
+  'update:incluirFeedback',
   'update:filtroRiesgo',
   'update:tarea',
   'download-csv',

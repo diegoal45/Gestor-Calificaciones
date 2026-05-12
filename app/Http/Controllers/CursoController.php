@@ -496,6 +496,7 @@ class CursoController extends Controller
             'incluir_grupo' => 'sometimes|boolean',
             'incluir_definitiva' => 'sometimes|boolean',
             'incluir_asistencia_pct' => 'sometimes|boolean',
+            'incluir_feedback' => 'sometimes|boolean',
             'tarea_ids' => 'sometimes|array',
             'tarea_ids.*' => 'integer',
             'filtro_riesgo' => 'sometimes|in:todos,riesgo',
@@ -505,6 +506,7 @@ class CursoController extends Controller
         $incluirGrupo = (bool) ($data['incluir_grupo'] ?? false);
         $incluirDefinitiva = (bool) ($data['incluir_definitiva'] ?? true);
         $incluirAsistenciaPct = (bool) ($data['incluir_asistencia_pct'] ?? false);
+        $incluirFeedback = (bool) ($data['incluir_feedback'] ?? false);
         $tareaIds = array_values(array_unique(array_map('intval', $data['tarea_ids'] ?? [])));
         $filtroRiesgo = $data['filtro_riesgo'] ?? 'todos';
 
@@ -523,9 +525,11 @@ class CursoController extends Controller
         $curso->load('tareas.notas');
 
         $calificacionesMap = [];
+        $feedbackMap = [];
         foreach ($curso->tareas as $tarea) {
             foreach ($tarea->notas as $nota) {
                 $calificacionesMap[$nota->id_estudiante . '_' . $nota->id_tarea] = (float) $nota->nota;
+                $feedbackMap[$nota->id_estudiante . '_' . $nota->id_tarea] = $nota->feedback ?? '';
             }
         }
 
@@ -555,6 +559,9 @@ class CursoController extends Controller
         foreach ($selectedTareas as $t) {
             $p = (float) ($t->porcentaje ?? 0);
             $headers[] = $p > 0 ? ($t->nombre . ' (' . $p . '%)') : $t->nombre;
+            if ($incluirFeedback) {
+                $headers[] = 'Feedback - ' . $t->nombre;
+            }
         }
         if ($incluirAsistenciaPct && $curso->usa_asistencia) {
             $headers[] = 'Asistencia %';
@@ -597,6 +604,9 @@ class CursoController extends Controller
                 $row[] = isset($calificacionesMap[$key])
                     ? number_format($calificacionesMap[$key], 1, '.', '')
                     : '';
+                if ($incluirFeedback) {
+                    $row[] = $feedbackMap[$key] ?? '';
+                }
             }
             if ($incluirAsistenciaPct && $curso->usa_asistencia) {
                 $row[] = number_format($asistenciaPctByEst[$eid] ?? 0, 2, '.', '');

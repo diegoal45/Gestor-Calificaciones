@@ -81,16 +81,76 @@
       </div>
 
       <div v-else-if="activeTab === 'Simulador'" class="bg-white rounded-4 border-0 shadow-sm p-4">
-        <div class="row g-3">
-          <div class="col-md-6" v-for="s in simulador" :key="s.id">
-            <label class="form-label fw-medium">{{ s.nombre }} ({{ s.porcentaje }}%)</label>
-            <input type="range" min="0" max="5" step="0.1" class="form-range" v-model.number="s.simulada">
-            <div class="small text-muted">Nota simulada: {{ s.simulada.toFixed(1) }}</div>
+        <div v-if="!simulador || simulador.length === 0">
+          <div class="alert alert-warning">No hay tareas disponibles para simular.</div>
+        </div>
+        
+        <div v-else>
+          <div class="row mb-4">
+            <div class="col-md-6">
+              <label class="form-label fw-bold">Nota definitiva deseada</label>
+              <div class="input-group">
+                <input type="number" min="0" max="5" step="0.1" class="form-control custom-input" v-model.number="notaObjetivo">
+                <button class="btn btn-primary-custom" @click="calcularNotasMinimas">Calcular mínimo necesario</button>
+              </div>
+              <small class="text-muted">Define la nota final que quieres alcanzar</small>
+            </div>
+            <div class="col-md-6">
+              <div class="card p-3 border-0 bg-light h-100">
+                <small class="text-muted">Promedio actual</small>
+                <strong class="display-6">{{ promedioActual.toFixed(1) }}</strong>
+                <small class="text-muted">Promedio simulado</small>
+                <strong class="display-6" :class="getNotaClass(promedioSimulado)">{{ promedioSimulado.toFixed(1) }}</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="table-responsive mb-4">
+            <table class="table table-hover">
+              <thead class="table-light">
+                <tr>
+                  <th>Tarea</th>
+                  <th class="text-center">Peso</th>
+                  <th class="text-center">Nota Actual</th>
+                  <th class="text-center">Nota Simulada</th>
+                  <th class="text-center">Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="t in simulador" :key="t.id" :class="{ 'table-warning': t.nota_actual === null }">
+                  <td class="fw-medium">{{ t.nombre }}</td>
+                  <td class="text-center">{{ t.porcentaje }}%</td>
+                  <td class="text-center">
+                    <span v-if="t.nota_actual !== null" class="fw-bold">{{ t.nota_actual.toFixed(1) }}</span>
+                    <span v-else class="text-muted">-</span>
+                  </td>
+                  <td class="text-center">
+                    <div class="input-group input-group-sm">
+                      <input 
+                        type="number" 
+                        min="0" 
+                        max="5" 
+                        step="0.1" 
+                        class="form-control custom-input text-center" 
+                        v-model.number="t.simulada"
+                        @input="actualizarPromedio"
+                      >
+                      <div class="input-group-text">/5.0</div>
+                    </div>
+                  </td>
+                  <td class="text-center">
+                    <span v-if="t.nota_actual !== null" class="badge bg-success">Calificada</span>
+                    <span v-else class="badge bg-warning">Por calificar</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div v-if="mensajeCalculo" class="alert mt-3" :class="promedioSimulado >= notaObjetivo ? 'alert-success' : 'alert-warning'">
+            {{ mensajeCalculo }}
           </div>
         </div>
-        <hr />
-        <h5 class="mb-1">Nota proyectada: <span class="text-primary">{{ notaProyectada.toFixed(1) }}</span></h5>
-        <div class="text-muted small">{{ mensajeSimulador }}</div>
       </div>
 
       <div v-else-if="activeTab === 'Progreso'" class="bg-white rounded-4 border-0 shadow-sm p-4">
@@ -183,7 +243,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { apiRequest } from '../../api.js'
 
@@ -215,6 +275,11 @@ const analisis = ref({
 })
 const asistencias = ref([])
 const cursoConfig = ref({ usa_asistencia: false, peso_asistencia: 0 })
+const notaObjetivo = ref(3.0)
+const promedioActual = ref(0.0)
+const promedioSimulado = ref(0.0)
+const mensajeCalculo = ref('')
+const loadingSimulador = ref(false)
 
 const feedbackItems = computed(() => tareas.value.filter(t => t.feedback))
 const tareasConNota = computed(() => tareas.value.filter(t => t.nota_id))
@@ -234,20 +299,6 @@ const progresoNotas = computed(() => {
   if (!tareas.value.length) return 0
   const conNota = tareas.value.filter(t => t.nota !== null && t.nota !== undefined).length
   return Math.round((conNota / tareas.value.length) * 100)
-})
-const notaProyectada = computed(() => {
-  let suma = 0
-  let peso = 0
-  simulador.value.forEach(t => {
-    suma += (t.simulada || 0) * (t.porcentaje / 100)
-    peso += t.porcentaje
-  })
-  if (!peso) return 0
-  return suma / (peso / 100)
-})
-const mensajeSimulador = computed(() => {
-  if (notaProyectada.value >= cursoNotaMinima.value) return 'Vas aprobando con esta proyeccion.'
-  return `Necesitas minimo ${cursoNotaMinima.value} para aprobar.`
 })
 const comparacionCurso = computed(() => {
   const est = parseFloat(estudiante.value.promedio)
@@ -270,6 +321,119 @@ const notaConAsistencia = computed(() => {
   return final.toFixed(1)
 })
 
+function actualizarPromedioActual() {
+  let suma = 0
+  let peso = 0
+  simulador.value.forEach(t => {
+    if (t.nota_actual !== null) {
+      suma += t.nota_actual * (t.porcentaje / 100)
+      peso += t.porcentaje
+    }
+  })
+  promedioActual.value = peso > 0 ? suma / (peso / 100) : 0
+}
+
+function actualizarPromedio() {
+  let suma = 0
+  let peso = 0
+  simulador.value.forEach(t => {
+    suma += (t.simulada || 0) * (t.porcentaje / 100)
+    peso += t.porcentaje
+  })
+  promedioSimulado.value = peso > 0 ? suma / (peso / 100) : 0
+}
+
+function calcularNotasMinimas() {
+  try {
+    if (!simulador.value || simulador.value.length === 0) {
+      mensajeCalculo.value = 'No hay tareas disponibles para simular.'
+      return
+    }
+    
+    const objetivo = notaObjetivo.value
+    const tareasPendientes = simulador.value.filter(t => t.nota_actual === null)
+    
+    if (tareasPendientes.length === 0) {
+      mensajeCalculo.value = 'No tienes tareas pendientes por calificar.'
+      return
+    }
+    
+    // Calcular suma y peso de tareas ya calificadas
+    let sumaCalificadas = 0
+    let pesoCalificadas = 0
+    simulador.value.forEach(t => {
+      if (t.nota_actual !== null) {
+        sumaCalificadas += t.nota_actual * (t.porcentaje / 100)
+        pesoCalificadas += t.porcentaje
+      }
+    })
+    
+    const pesoPendiente = 100 - pesoCalificadas
+    
+    if (pesoPendiente === 0) {
+      mensajeCalculo.value = 'Todas las tareas ya están calificadas.'
+      return
+    }
+    
+    // Calcular nota mínima necesaria en las tareas pendientes
+    const notaMinimaNecesaria = ((objetivo * 100) - (sumaCalificadas * 100)) / pesoPendiente
+    
+    // Asignar la nota mínima calculada a las tareas pendientes
+    simulador.value.forEach(t => {
+      if (t.nota_actual === null) {
+        t.simulada = Math.max(0, Math.min(5, notaMinimaNecesaria))
+      }
+    })
+    
+    actualizarPromedio()
+    
+    if (notaMinimaNecesaria > 5) {
+      mensajeCalculo.value = `⚠️ Es imposible alcanzar ${objetivo} incluso con notas perfectas en las tareas restantes. La máxima nota posible es ${promedioSimulado.value.toFixed(1)}.`
+    } else if (notaMinimaNecesaria < 0) {
+      mensajeCalculo.value = `✅ Ya garantizas al menos ${objetivo} con tus notas actuales. La mínima necesaria en tareas pendientes es 0.0.`
+    } else {
+      mensajeCalculo.value = `📊 Para alcanzar ${objetivo} necesitas mínimo ${notaMinimaNecesaria.toFixed(2)} en cada tarea pendiente (sin considerar ponderación individual).`
+    }
+  } catch (error) {
+    console.error('Error en calcularNotasMinimas:', error)
+    mensajeCalculo.value = 'Ocurrió un error al calcular las notas mínimas. Por favor intenta de nuevo.'
+  }
+}
+
+// Watcher para asegurar que el simulador tenga datos cuando se active
+watch(
+  () => activeTab.value,
+  async (newTab) => {
+    if (newTab === 'Simulador') {
+      // Si el simulador no tiene datos, intentar recargarlos
+      if (!simulador.value || simulador.value.length === 0) {
+        loadingSimulador.value = true
+        try {
+          const user = JSON.parse(localStorage.getItem('user'))
+          if (user?.id) {
+            const perfil = await apiRequest(`/api/estudiantes/${user.id}/perfil?curso_id=${cursoId}`)
+            if (perfil.tareas && Array.isArray(perfil.tareas)) {
+              simulador.value = perfil.tareas.map(t => ({
+                id: t.id,
+                nombre: t.nombre || 'Tarea sin nombre',
+                porcentaje: t.porcentaje || 0,
+                nota_actual: t.nota ? parseFloat(t.nota) : null,
+                simulada: t.nota ? parseFloat(t.nota) : 3.0,
+              }))
+              actualizarPromedioActual()
+              actualizarPromedio()
+            }
+          }
+        } catch (error) {
+          console.error('Error al recargar simulador:', error)
+        } finally {
+          loadingSimulador.value = false
+        }
+      }
+    }
+  }
+)
+
 onMounted(async () => {
   const qtab = String(route.query?.tab || '').toLowerCase()
   if (qtab === 'reclamos') activeTab.value = 'Reclamos'
@@ -279,14 +443,26 @@ onMounted(async () => {
     if (!user?.id) throw new Error('Usuario no encontrado en sesion')
 
     const perfil = await apiRequest(`/api/estudiantes/${user.id}/perfil?curso_id=${cursoId}`)
+    
     tareas.value = perfil.tareas || []
     estudiante.value = perfil.estudiante || estudiante.value
-    simulador.value = (perfil.tareas || []).map(t => ({
-      id: t.id,
-      nombre: t.nombre,
-      porcentaje: t.porcentaje,
-      simulada: t.nota ? parseFloat(t.nota) : 3.0,
-    }))
+    
+    // Inicializar simulador con validación
+    if (perfil.tareas && Array.isArray(perfil.tareas)) {
+      simulador.value = perfil.tareas.map(t => ({
+        id: t.id,
+        nombre: t.nombre || 'Tarea sin nombre',
+        porcentaje: t.porcentaje || 0,
+        nota_actual: t.nota ? parseFloat(t.nota) : null,
+        simulada: t.nota ? parseFloat(t.nota) : 3.0,
+      }))
+      
+      // Calcular promedio actual y simulado inicial
+      actualizarPromedioActual()
+      actualizarPromedio()
+    } else {
+      simulador.value = []
+    }
 
     const cursoRes = await apiRequest(`/api/cursos/${cursoId}`)
     const curso = cursoRes?.curso || cursoRes
@@ -325,6 +501,14 @@ function getEstadoClass(nota) {
   if (v >= 4.0) return 'bg-success text-white'
   if (v >= 3.0) return 'bg-warning text-dark'
   return 'bg-danger text-white'
+}
+
+function getNotaClass(nota) {
+  const v = parseFloat(nota)
+  if (isNaN(v)) return 'text-muted'
+  if (v >= 4.0) return 'text-success'
+  if (v >= 3.0) return 'text-warning'
+  return 'text-danger'
 }
 
 async function crearReclamo() {

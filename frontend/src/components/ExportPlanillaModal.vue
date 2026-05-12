@@ -12,6 +12,7 @@
           :incluir-email="incluirEmail"
           :incluir-grupo="incluirGrupo"
           :incluir-asistencia-pct="incluirAsistenciaPct"
+          :incluir-feedback="incluirFeedback"
           :filtro-riesgo="filtroRiesgo"
           :tareas-checks="tareasChecks"
           :can-export="canExport"
@@ -21,6 +22,7 @@
           @update:incluir-email="incluirEmail = $event"
           @update:incluir-grupo="incluirGrupo = $event"
           @update:incluir-asistencia-pct="incluirAsistenciaPct = $event"
+          @update:incluir-feedback="incluirFeedback = $event"
           @update:filtro-riesgo="filtroRiesgo = $event"
           @update:tarea="onToggleTarea"
           @download-csv="downloadCsv"
@@ -59,6 +61,7 @@
               :incluir-email="incluirEmail"
               :incluir-grupo="incluirGrupo"
               :incluir-asistencia-pct="incluirAsistenciaPct"
+              :incluir-feedback="incluirFeedback"
               :filtro-riesgo="filtroRiesgo"
               :tareas-checks="tareasChecks"
               :can-export="canExport"
@@ -68,6 +71,7 @@
               @update:incluir-email="incluirEmail = $event"
               @update:incluir-grupo="incluirGrupo = $event"
               @update:incluir-asistencia-pct="incluirAsistenciaPct = $event"
+              @update:incluir-feedback="incluirFeedback = $event"
               @update:filtro-riesgo="filtroRiesgo = $event"
               @update:tarea="onToggleTarea"
               @download-csv="downloadCsv"
@@ -102,6 +106,7 @@ const incluirDefinitiva = ref(true)
 const incluirEmail = ref(false)
 const incluirGrupo = ref(false)
 const incluirAsistenciaPct = ref(false)
+const incluirFeedback = ref(false)
 const filtroRiesgo = ref('todos')
 const tareasChecks = reactive({})
 
@@ -145,6 +150,7 @@ function buildBody(formato) {
     incluir_grupo: incluirGrupo.value,
     incluir_definitiva: incluirDefinitiva.value,
     incluir_asistencia_pct: usaAsistencia.value && incluirAsistenciaPct.value,
+    incluir_feedback: incluirFeedback.value,
     tarea_ids: selectedTareaIds.value,
     filtro_riesgo: filtroRiesgo.value,
   }

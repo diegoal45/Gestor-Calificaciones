@@ -1,7 +1,7 @@
 <template>
   <div class="d-flex min-vh-100 bg-light-custom">
     <!-- Sidebar -->
-    <aside class="sidebar d-flex flex-column bg-white shadow-sm">
+    <aside class="sidebar d-flex flex-column bg-white shadow-sm" :class="{ collapsed: sidebarCollapsed }">
       <div class="p-4 border-bottom d-flex align-items-center gap-3">
         <div class="brand-icon rounded text-white d-flex align-items-center justify-content-center fw-bold fs-4">
           G
@@ -39,11 +39,18 @@
       </div>
     </aside>
 
+    <!-- Mobile menu overlay -->
+    <div v-if="sidebarCollapsed === false" class="mobile-menu-overlay" @click="toggleSidebar"></div>
+    
     <!-- Main Content -->
-    <main class="flex-grow-1 d-flex flex-column overflow-hidden">
+    <main class="flex-grow-1 d-flex flex-column overflow-hidden" :class="{ 'sidebar-open': sidebarCollapsed === false }">
       <!-- Top Navbar -->
       <header class="top-navbar bg-white border-bottom px-4 py-3 d-flex align-items-center justify-content-between sticky-top">
         <div class="d-flex align-items-center gap-3">
+          <!-- Mobile menu toggle -->
+          <button class="mobile-menu-toggle d-md-none" @click="toggleSidebar">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+          </button>
           <!-- Breadcrumb base -->
           <div class="text-muted fw-medium d-none d-sm-block">
             Académico <span class="mx-2">/</span> <span class="text-dark">Mis Cursos</span>
@@ -87,6 +94,7 @@ const router = useRouter()
 const route = useRoute()
 const userName = ref('')
 const userRole = ref('')
+const sidebarCollapsed = ref(true)
 const userRoleLabel = computed(() => {
   const r = String(userRole.value || '').toLowerCase()
   if (r === 'estudiante') return 'Estudiante'
@@ -126,6 +134,10 @@ onMounted(() => {
   }
 })
 
+function toggleSidebar() {
+  sidebarCollapsed.value = !sidebarCollapsed.value
+}
+
 async function logout() {
   try {
     // Intentar logout en el servidor para invalidar el token
@@ -137,6 +149,13 @@ async function logout() {
   localStorage.removeItem('user')
   router.push('/')
 }
+
+// Auto-collapse sidebar on desktop
+onMounted(() => {
+  if (window.innerWidth >= 768) {
+    sidebarCollapsed.value = false
+  }
+})
 </script>
 
 <style scoped>
@@ -156,12 +175,33 @@ async function logout() {
   width: 280px;
   min-width: 280px;
   transition: width 0.3s ease;
+  position: fixed;
+  left: 0;
+  top: 0;
+  height: 100vh;
+  z-index: 1000;
+  transform: translateX(0);
+}
+
+.sidebar.collapsed {
+  transform: translateX(-100%);
 }
 
 @media (max-width: 768px) {
   .sidebar {
-    width: 80px;
-    min-width: 80px;
+    width: 280px;
+    min-width: 280px;
+  }
+  
+  .sidebar:not(.collapsed) {
+    transform: translateX(0);
+  }
+}
+
+@media (max-width: 576px) {
+  .sidebar {
+    width: 100%;
+    min-width: 100%;
   }
 }
 
@@ -201,6 +241,18 @@ async function logout() {
   width: 300px;
 }
 
+@media (max-width: 992px) {
+  .search-input {
+    width: 200px;
+  }
+}
+
+@media (max-width: 768px) {
+  .search-input {
+    width: 150px;
+  }
+}
+
 .search-input:focus {
   background: #ffffff;
   border-color: #cbd5e1;
@@ -211,5 +263,77 @@ async function logout() {
   width: 42px;
   height: 42px;
   background: linear-gradient(135deg, #1e40af 0%, #6b21a8 100%);
+}
+
+/* Mobile menu toggle */
+.mobile-menu-toggle {
+  display: none;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #1e40af;
+  cursor: pointer;
+  padding: 0.5rem;
+}
+
+@media (max-width: 768px) {
+  .mobile-menu-toggle {
+    display: block;
+  }
+  
+  main {
+    margin-left: 0;
+  }
+  
+  .sidebar:not(.collapsed) + main {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 576px) {
+  .top-navbar {
+    padding: 1rem;
+  }
+  
+  .d-flex.align-items-center.gap-4 {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+}
+
+/* Mobile menu overlay */
+.mobile-menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-menu-overlay {
+    display: block;
+  }
+}
+
+/* Adjust main content when sidebar is open on mobile */
+@media (max-width: 767px) {
+  main.sidebar-open {
+    margin-left: 0;
+  }
+}
+
+@media (min-width: 768px) {
+  .mobile-menu-overlay {
+    display: none !important;
+  }
+  
+  .sidebar {
+    transform: translateX(0) !important;
+  }
 }
 </style>

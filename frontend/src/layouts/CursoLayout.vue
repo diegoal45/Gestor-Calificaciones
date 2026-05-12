@@ -119,12 +119,47 @@ function volverDashboard() {
 </script>
 
 <style scoped>
+/* Course header responsive */
 .course-header {
   border-radius: 12px 12px 0 0;
   overflow: hidden;
-  margin-top: -1rem; /* Adjust if it's inside a padded container */
+  margin-top: -1rem;
   margin-left: -1rem;
   margin-right: -1rem;
+}
+
+@media (max-width: 768px) {
+  .course-header {
+    margin-top: -0.5rem;
+    margin-left: -0.5rem;
+    margin-right: -0.5rem;
+  }
+  
+  .course-header .d-flex {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  
+  .course-header .d-flex .text-end {
+    text-align: left !important;
+  }
+  
+  .course-header .d-flex.gap-4 {
+    flex-direction: row;
+    justify-content: space-between;
+    width: 100%;
+  }
+}
+
+@media (max-width: 576px) {
+  .course-header h2 {
+    font-size: 1.5rem;
+  }
+  
+  .course-header .fs-4 {
+    font-size: 1.25rem;
+  }
 }
 
 .banner-color-0 { background: linear-gradient(135deg, #2563eb, #1e40af); }
@@ -132,6 +167,7 @@ function volverDashboard() {
 .banner-color-2 { background: linear-gradient(135deg, #9333ea, #7e22ce); }
 .banner-color-3 { background: linear-gradient(135deg, #e11d48, #be123c); }
 
+/* Abstract pattern responsive */
 .abstract-pattern {
   position: absolute;
   top: 0;
@@ -144,6 +180,22 @@ function volverDashboard() {
   z-index: 0;
 }
 
+@media (max-width: 768px) {
+  .abstract-pattern {
+    width: 200px;
+    height: 200px;
+    transform: translate(20%, -20%);
+  }
+}
+
+@media (max-width: 576px) {
+  .abstract-pattern {
+    width: 150px;
+    height: 150px;
+    transform: translate(10%, -10%);
+  }
+}
+
 .hover-opacity-100:hover {
   opacity: 1 !important;
 }
@@ -151,12 +203,52 @@ function volverDashboard() {
   transition: all 0.2s ease;
 }
 
+/* Tabs responsive */
 .custom-tabs .nav-link {
   border: none;
   border-bottom: 3px solid transparent;
   color: #64748b;
   padding: 1rem 0.5rem;
   transition: all 0.2s;
+  white-space: nowrap;
+  font-size: 0.875rem;
+}
+
+@media (max-width: 992px) {
+  .custom-tabs .nav-link {
+    padding: 0.75rem 0.25rem;
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .custom-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+  }
+  
+  .custom-tabs .nav-link {
+    padding: 0.5rem 0.25rem;
+    font-size: 0.75rem;
+    min-width: fit-content;
+  }
+}
+
+@media (max-width: 576px) {
+  .custom-tabs {
+    gap: 0.25rem;
+  }
+  
+  .custom-tabs .nav-link {
+    padding: 0.5rem 0.125rem;
+    font-size: 0.7rem;
+  }
+  
+  .custom-tabs .nav-link svg {
+    width: 12px;
+    height: 12px;
+  }
 }
 
 .custom-tabs .nav-link:hover {
