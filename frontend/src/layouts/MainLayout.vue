@@ -320,6 +320,17 @@ onMounted(() => {
   }
 }
 
+/* Adjust main content when sidebar is open on desktop */
+@media (min-width: 768px) {
+  main {
+    margin-left: 280px;
+  }
+  
+  .sidebar.collapsed + main {
+    margin-left: 0;
+  }
+}
+
 /* Adjust main content when sidebar is open on mobile */
 @media (max-width: 767px) {
   main.sidebar-open {

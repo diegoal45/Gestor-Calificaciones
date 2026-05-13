@@ -4,6 +4,8 @@ use App\Models\Curso;
 use App\Models\Nota;
 use App\Models\Asistencia;
 use App\Http\Requests\CursoRequest;
+use App\Events\CursoCreado;
+use App\Events\EstudianteInscrito;
 use Illuminate\Http\Request;
 
 class CursoController extends Controller
@@ -127,6 +129,13 @@ class CursoController extends Controller
         $inscripcion = $curso->inscripciones()->create([
             'id_estudiante' => $data['id_estudiante'],
         ]);
+        
+        // Obtener el estudiante para el evento
+        $estudiante = \App\Models\Usuario::find($data['id_estudiante']);
+        
+        // Disparar evento de inscripción
+        event(new EstudianteInscrito($estudiante, $curso));
+        
         return response()->json(['inscripcion' => $inscripcion], 201);
     }
 
@@ -245,13 +254,17 @@ class CursoController extends Controller
         $curso = Curso::create([
             'nombre' => $data['nombre'],
             'descripcion' => $data['descripcion'] ?? '',
-            'id_profesor' => $request->user()->id ?? $data['id_profesor'] ?? null,
+            'id_profesor' => auth()->user()->id ?? $data['id_profesor'] ?? null,
             'nota_minima_aprobatoria' => $data['nota_minima'],
             'nota_maxima' => $data['nota_maxima'],
             'usa_asistencia' => $data['usa_asistencia'] ?? false,
             'peso_asistencia' => $data['peso_asistencia'] ?? null,
             'metodo_calificacion' => $data['metodo_calificacion'] ?? Curso::METODO_PONDERACION,
         ]);
+        
+        // Disparar evento de curso creado
+        event(new CursoCreado($curso, 'creado'));
+        
         return response()->json($curso, 201);
     }
 

@@ -6,6 +6,7 @@ use App\Models\Nota;
 use App\Models\Tarea;
 use App\Models\Curso;
 use App\Models\EvaluacionRubrica;
+use App\Events\CalificacionRegistrada;
 use App\Http\Requests\NotaRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -86,6 +87,14 @@ class NotaController extends Controller
         $data = $request->validated();
         $data['id_tarea'] = $tareaId;
         $nota = Nota::create($data);
+        
+        // Obtener datos para el evento
+        $tarea = Tarea::findOrFail($tareaId);
+        $estudiante = \App\Models\Usuario::find($data['id_estudiante']);
+        
+        // Disparar evento de calificación registrada
+        event(new CalificacionRegistrada($estudiante, $tarea, $nota));
+        
         return response()->json($nota, 201);
     }
 

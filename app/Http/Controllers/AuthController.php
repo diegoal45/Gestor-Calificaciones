@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Usuario;
+use App\Events\UsuarioRegistrado;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
@@ -21,6 +22,10 @@ class AuthController extends Controller
         ]);
         $data['password'] = Hash::make($data['password']);
         $usuario = Usuario::create($data);
+        
+        // Disparar evento de bienvenida
+        event(new UsuarioRegistrado($usuario));
+        
         $token = $usuario->createToken('auth_token')->plainTextToken;
         return response()->json(['usuario' => $usuario, 'token' => $token], 201);
     }
