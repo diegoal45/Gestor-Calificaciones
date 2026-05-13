@@ -90,10 +90,10 @@
             <div class="col-md-6">
               <label class="form-label fw-bold">Nota definitiva deseada</label>
               <div class="input-group">
-                <input type="number" min="0" max="5" step="0.1" class="form-control custom-input" v-model.number="notaObjetivo">
+                <input type="number" min="0" :max="cursoNotaMaxima" step="0.1" class="form-control custom-input" v-model.number="notaObjetivo">
                 <button class="btn btn-primary-custom" @click="calcularNotasMinimas">Calcular mínimo necesario</button>
               </div>
-              <small class="text-muted">Define la nota final que quieres alcanzar</small>
+              <small class="text-muted">Define la nota final que quieres alcanzar (máximo: {{ cursoNotaMaxima }})</small>
             </div>
             <div class="col-md-6">
               <div class="card p-3 border-0 bg-light h-100">
@@ -129,13 +129,13 @@
                       <input 
                         type="number" 
                         min="0" 
-                        max="5" 
+                        :max="cursoNotaMaxima" 
                         step="0.1" 
                         class="form-control custom-input text-center" 
                         v-model.number="t.simulada"
                         @input="actualizarPromedio"
                       >
-                      <div class="input-group-text">/5.0</div>
+                      <div class="input-group-text">/{{ cursoNotaMaxima.toFixed(1) }}</div>
                     </div>
                   </td>
                   <td class="text-center">
@@ -376,18 +376,18 @@ function calcularNotasMinimas() {
     }
     
     // Calcular nota mínima necesaria en las tareas pendientes
-    const notaMinimaNecesaria = ((objetivo * 100) - (sumaCalificadas * 100)) / pesoPendiente
+    const notaMinimaNecesaria = (objetivo - sumaCalificadas) / (pesoPendiente / 100)
     
     // Asignar la nota mínima calculada a las tareas pendientes
     simulador.value.forEach(t => {
       if (t.nota_actual === null) {
-        t.simulada = Math.max(0, Math.min(5, notaMinimaNecesaria))
+        t.simulada = Math.max(0, Math.min(cursoNotaMaxima.value, notaMinimaNecesaria))
       }
     })
     
     actualizarPromedio()
     
-    if (notaMinimaNecesaria > 5) {
+    if (notaMinimaNecesaria > cursoNotaMaxima.value) {
       mensajeCalculo.value = `⚠️ Es imposible alcanzar ${objetivo} incluso con notas perfectas en las tareas restantes. La máxima nota posible es ${promedioSimulado.value.toFixed(1)}.`
     } else if (notaMinimaNecesaria < 0) {
       mensajeCalculo.value = `✅ Ya garantizas al menos ${objetivo} con tus notas actuales. La mínima necesaria en tareas pendientes es 0.0.`
@@ -418,7 +418,7 @@ watch(
                 nombre: t.nombre || 'Tarea sin nombre',
                 porcentaje: t.porcentaje || 0,
                 nota_actual: t.nota ? parseFloat(t.nota) : null,
-                simulada: t.nota ? parseFloat(t.nota) : 3.0,
+                simulada: t.nota ? parseFloat(t.nota) : (cursoNotaMaxima.value / 2),
               }))
               actualizarPromedioActual()
               actualizarPromedio()
@@ -454,7 +454,7 @@ onMounted(async () => {
         nombre: t.nombre || 'Tarea sin nombre',
         porcentaje: t.porcentaje || 0,
         nota_actual: t.nota ? parseFloat(t.nota) : null,
-        simulada: t.nota ? parseFloat(t.nota) : 3.0,
+        simulada: t.nota ? parseFloat(t.nota) : (cursoNotaMaxima.value / 2),
       }))
       
       // Calcular promedio actual y simulado inicial
@@ -473,6 +473,11 @@ onMounted(async () => {
     cursoConfig.value = {
       usa_asistencia: !!curso?.usa_asistencia,
       peso_asistencia: Number(curso?.peso_asistencia || 0),
+    }
+    
+    // Establecer el objetivo inicial a la nota mínima aprobatoria del curso
+    if (notaObjetivo.value === 3.0) {
+      notaObjetivo.value = cursoNotaMinima.value
     }
 
     reclamos.value = await apiRequest(`/api/reclamos/estudiante/${user.id}`)
