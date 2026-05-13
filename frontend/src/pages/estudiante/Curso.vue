@@ -275,6 +275,7 @@ const analisis = ref({
 })
 const asistencias = ref([])
 const cursoConfig = ref({ usa_asistencia: false, peso_asistencia: 0 })
+const cursoMetodoCalificacion = ref('ponderacion')
 const notaObjetivo = ref(3.0)
 const promedioActual = ref(0.0)
 const promedioSimulado = ref(0.0)
@@ -322,52 +323,88 @@ const notaConAsistencia = computed(() => {
 })
 
 function actualizarPromedioActual() {
-  let suma = 0
-  let peso = 0
-  simulador.value.forEach(t => {
-    if (t.nota_actual !== null) {
-      suma += t.nota_actual * (t.porcentaje / 100)
-      peso += t.porcentaje
-    }
-  })
-  promedioActual.value = peso > 0 ? suma / (peso / 100) : 0
+  if (cursoMetodoCalificacion.value === 'ponderacion') {
+    // Cálculo con ponderación
+    let suma = 0
+    simulador.value.forEach(t => {
+      if (t.nota_actual !== null) {
+        suma += t.nota_actual * (t.porcentaje / 100)
+      }
+    })
+    promedioActual.value = suma
+  } else {
+    // Cálculo por promedio simple
+    let suma = 0
+    let cantidad = 0
+    simulador.value.forEach(t => {
+      if (t.nota_actual !== null) {
+        suma += t.nota_actual
+        cantidad++
+      }
+    })
+    promedioActual.value = cantidad > 0 ? suma / cantidad : 0
+  }
+  
+  console.log(`Promedio actual (${cursoMetodoCalificacion.value}):`, promedioActual.value)
 }
 
 function actualizarPromedio() {
   try {
-    let suma = 0
-    let peso = 0
-    
     if (!Array.isArray(simulador.value)) {
       console.error('Simulador no es un array:', simulador.value)
       promedioSimulado.value = 0
       return
     }
     
-    simulador.value.forEach((t, index) => {
-      if (!t || typeof t !== 'object') {
-        console.error(`Tarea inválida en índice ${index}:`, t)
-        return
-      }
-      
-      const simulada = parseFloat(t.simulada) || 0
-      const porcentaje = parseFloat(t.porcentaje) || 0
-      
-      if (isNaN(simulada) || isNaN(porcentaje)) {
-        console.error(`Valores inválidos en tarea ${t.id}:`, { simulada: t.simulada, porcentaje: t.porcentaje })
-        return
-      }
-      
-      suma += simulada * (porcentaje / 100)
-      peso += porcentaje
-    })
-    
-    promedioSimulado.value = peso > 0 ? suma / (peso / 100) : 0
+    if (cursoMetodoCalificacion.value === 'ponderacion') {
+      // Cálculo con ponderación
+      let suma = 0
+      simulador.value.forEach((t, index) => {
+        if (!t || typeof t !== 'object') {
+          console.error(`Tarea inválida en índice ${index}:`, t)
+          return
+        }
+        
+        const simulada = parseFloat(t.simulada) || 0
+        const porcentaje = parseFloat(t.porcentaje) || 0
+        
+        if (isNaN(simulada) || isNaN(porcentaje)) {
+          console.error(`Valores inválidos en tarea ${t.id}:`, { simulada: t.simulada, porcentaje: t.porcentaje })
+          return
+        }
+        
+        suma += simulada * (porcentaje / 100)
+      })
+      promedioSimulado.value = suma
+    } else {
+      // Cálculo por promedio simple
+      let suma = 0
+      let cantidad = 0
+      simulador.value.forEach((t, index) => {
+        if (!t || typeof t !== 'object') {
+          console.error(`Tarea inválida en índice ${index}:`, t)
+          return
+        }
+        
+        const simulada = parseFloat(t.simulada) || 0
+        
+        if (isNaN(simulada)) {
+          console.error(`Valor inválido en tarea ${t.id}:`, { simulada: t.simulada })
+          return
+        }
+        
+        suma += simulada
+        cantidad++
+      })
+      promedioSimulado.value = cantidad > 0 ? suma / cantidad : 0
+    }
     
     if (isNaN(promedioSimulado.value) || !isFinite(promedioSimulado.value)) {
-      console.error('Promedio simulado resultó en NaN/Infinito:', { suma, peso, promedio: promedioSimulado.value })
+      console.error('Promedio simulado resultó en NaN/Infinito:', { promedio: promedioSimulado.value })
       promedioSimulado.value = 0
     }
+    
+    console.log(`Promedio simulado (${cursoMetodoCalificacion.value}):`, promedioSimulado.value)
   } catch (error) {
     console.error('Error en actualizarPromedio:', error)
     promedioSimulado.value = 0
@@ -383,31 +420,44 @@ function calcularNotasMinimas() {
     
     const objetivo = notaObjetivo.value
     const tareasPendientes = simulador.value.filter(t => t.nota_actual === null)
+    const cantidadPendientes = tareasPendientes.length
     
-    if (tareasPendientes.length === 0) {
+    if (cantidadPendientes === 0) {
       mensajeCalculo.value = 'No tienes tareas pendientes por calificar.'
       return
     }
     
-    // Calcular suma y peso de tareas ya calificadas
     let sumaCalificadas = 0
-    let pesoCalificadas = 0
+    let cantidadCalificadas = 0
+    let pesoTotal = 0
+    
     simulador.value.forEach(t => {
       if (t.nota_actual !== null) {
-        sumaCalificadas += t.nota_actual * (t.porcentaje / 100)
-        pesoCalificadas += t.porcentaje
+        if (cursoMetodoCalificacion.value === 'ponderacion') {
+          sumaCalificadas += t.nota_actual * (t.porcentaje / 100)
+        } else {
+          sumaCalificadas += t.nota_actual
+          cantidadCalificadas++
+        }
       }
+      pesoTotal += t.porcentaje
     })
     
-    const pesoPendiente = 100 - pesoCalificadas
+    let notaMinimaNecesaria
     
-    if (pesoPendiente === 0) {
-      mensajeCalculo.value = 'Todas las tareas ya están calificadas.'
-      return
+    if (cursoMetodoCalificacion.value === 'ponderacion') {
+      // Cálculo con ponderación
+      const pesoPendiente = 100 - pesoTotal
+      if (pesoPendiente === 0) {
+        mensajeCalculo.value = 'Todas las tareas ya están calificadas.'
+        return
+      }
+      notaMinimaNecesaria = (objetivo - sumaCalificadas) / (pesoPendiente / 100)
+    } else {
+      // Cálculo por promedio simple
+      const cantidadTotal = cantidadCalificadas + cantidadPendientes
+      notaMinimaNecesaria = (objetivo * cantidadTotal - sumaCalificadas) / cantidadPendientes
     }
-    
-    // Calcular nota mínima necesaria en las tareas pendientes
-    const notaMinimaNecesaria = (objetivo - sumaCalificadas) / (pesoPendiente / 100)
     
     // Asignar la nota mínima calculada a las tareas pendientes
     simulador.value.forEach(t => {
@@ -418,12 +468,14 @@ function calcularNotasMinimas() {
     
     actualizarPromedio()
     
+    const metodoTexto = cursoMetodoCalificacion.value === 'ponderacion' ? 'ponderación' : 'promedio simple'
+    
     if (notaMinimaNecesaria > cursoNotaMaxima.value) {
-      mensajeCalculo.value = `⚠️ Es imposible alcanzar ${objetivo} incluso con notas perfectas en las tareas restantes. La máxima nota posible es ${promedioSimulado.value.toFixed(1)}.`
+      mensajeCalculo.value = `⚠️ Es imposible alcanzar ${objetivo} incluso con notas perfectas en las tareas restantes. La máxima nota posible es ${promedioSimulado.value.toFixed(1)} (${metodoTexto}).`
     } else if (notaMinimaNecesaria < 0) {
-      mensajeCalculo.value = `✅ Ya garantizas al menos ${objetivo} con tus notas actuales. La mínima necesaria en tareas pendientes es 0.0.`
+      mensajeCalculo.value = `✅ Ya garantizas al menos ${objetivo} con tus notas actuales. La mínima necesaria en tareas pendientes es 0.0 (${metodoTexto}).`
     } else {
-      mensajeCalculo.value = `📊 Para alcanzar ${objetivo} necesitas mínimo ${notaMinimaNecesaria.toFixed(2)} en cada tarea pendiente (sin considerar ponderación individual).`
+      mensajeCalculo.value = `📊 Para alcanzar ${objetivo} necesitas mínimo ${notaMinimaNecesaria.toFixed(2)} en cada tarea pendiente (cálculo por ${metodoTexto}).`
     }
   } catch (error) {
     console.error('Error en calcularNotasMinimas:', error)
@@ -566,10 +618,17 @@ onMounted(async () => {
     cursoPromedio.value = parseFloat(curso?.promedio_general || 0)
     cursoNotaMinima.value = parseFloat(curso?.nota_minima_aprobatoria || 3.0)
     cursoNotaMaxima.value = parseFloat(curso?.nota_maxima || 5.0)
+    cursoMetodoCalificacion.value = curso?.metodo_calificacion || 'ponderacion'
     cursoConfig.value = {
       usa_asistencia: !!curso?.usa_asistencia,
       peso_asistencia: Number(curso?.peso_asistencia || 0),
     }
+    
+    console.log('Configuración del curso:', {
+      metodo: cursoMetodoCalificacion.value,
+      notaMaxima: cursoNotaMaxima.value,
+      notaMinima: cursoNotaMinima.value
+    })
     
     // Establecer el objetivo inicial a la nota mínima aprobatoria del curso
     if (notaObjetivo.value === 3.0) {
