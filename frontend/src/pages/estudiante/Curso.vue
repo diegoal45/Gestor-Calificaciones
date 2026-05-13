@@ -334,13 +334,44 @@ function actualizarPromedioActual() {
 }
 
 function actualizarPromedio() {
-  let suma = 0
-  let peso = 0
-  simulador.value.forEach(t => {
-    suma += (t.simulada || 0) * (t.porcentaje / 100)
-    peso += t.porcentaje
-  })
-  promedioSimulado.value = peso > 0 ? suma / (peso / 100) : 0
+  try {
+    let suma = 0
+    let peso = 0
+    
+    if (!Array.isArray(simulador.value)) {
+      console.error('Simulador no es un array:', simulador.value)
+      promedioSimulado.value = 0
+      return
+    }
+    
+    simulador.value.forEach((t, index) => {
+      if (!t || typeof t !== 'object') {
+        console.error(`Tarea inválida en índice ${index}:`, t)
+        return
+      }
+      
+      const simulada = parseFloat(t.simulada) || 0
+      const porcentaje = parseFloat(t.porcentaje) || 0
+      
+      if (isNaN(simulada) || isNaN(porcentaje)) {
+        console.error(`Valores inválidos en tarea ${t.id}:`, { simulada: t.simulada, porcentaje: t.porcentaje })
+        return
+      }
+      
+      suma += simulada * (porcentaje / 100)
+      peso += porcentaje
+    })
+    
+    promedioSimulado.value = peso > 0 ? suma / (peso / 100) : 0
+    
+    if (isNaN(promedioSimulado.value) || !isFinite(promedioSimulado.value)) {
+      console.error('Promedio simulado resultó en NaN/Infinito:', { suma, peso, promedio: promedioSimulado.value })
+      promedioSimulado.value = 0
+    }
+  } catch (error) {
+    console.error('Error en actualizarPromedio:', error)
+    promedioSimulado.value = 0
+  }
 }
 
 function calcularNotasMinimas() {
@@ -409,17 +440,44 @@ watch(
       if (!simulador.value || simulador.value.length === 0) {
         loadingSimulador.value = true
         try {
+          console.log('Recargando simulador desde watcher...')
           const user = JSON.parse(localStorage.getItem('user'))
           if (user?.id) {
             const perfil = await apiRequest(`/api/estudiantes/${user.id}/perfil?curso_id=${cursoId}`)
+            console.log('Datos recibidos en watcher:', perfil)
+            
             if (perfil.tareas && Array.isArray(perfil.tareas)) {
-              simulador.value = perfil.tareas.map(t => ({
-                id: t.id,
-                nombre: t.nombre || 'Tarea sin nombre',
-                porcentaje: t.porcentaje || 0,
-                nota_actual: t.nota ? parseFloat(t.nota) : null,
-                simulada: t.nota ? parseFloat(t.nota) : (cursoNotaMaxima.value / 2),
-              }))
+              simulador.value = perfil.tareas.map((t, index) => {
+                try {
+                  const id = t.id
+                  const nombre = t.nombre || 'Tarea sin nombre'
+                  const porcentaje = parseFloat(t.porcentaje) || 0
+                  
+                  let nota_actual = null
+                  let simulada = cursoNotaMaxima.value / 2
+                  
+                  if (t.nota !== null && t.nota !== undefined && t.nota !== '') {
+                    const notaParseada = parseFloat(String(t.nota).replace(',', '.'))
+                    if (!isNaN(notaParseada)) {
+                      nota_actual = notaParseada
+                      simulada = notaParseada
+                    }
+                  }
+                  
+                  return { id, nombre, porcentaje, nota_actual, simulada }
+                } catch (error) {
+                  console.error(`Error procesando tarea ${index} en watcher:`, error)
+                  return {
+                    id: t.id || index,
+                    nombre: 'Error en tarea',
+                    porcentaje: 0,
+                    nota_actual: null,
+                    simulada: cursoNotaMaxima.value / 2
+                  }
+                }
+              })
+              
+              console.log('Simulador recargado:', simulador.value)
               actualizarPromedioActual()
               actualizarPromedio()
             }
@@ -449,18 +507,56 @@ onMounted(async () => {
     
     // Inicializar simulador con validación
     if (perfil.tareas && Array.isArray(perfil.tareas)) {
-      simulador.value = perfil.tareas.map(t => ({
-        id: t.id,
-        nombre: t.nombre || 'Tarea sin nombre',
-        porcentaje: t.porcentaje || 0,
-        nota_actual: t.nota ? parseFloat(t.nota) : null,
-        simulada: t.nota ? parseFloat(t.nota) : (cursoNotaMaxima.value / 2),
-      }))
+      console.log('Datos recibidos del API:', perfil.tareas)
+      
+      simulador.value = perfil.tareas.map((t, index) => {
+        try {
+          const id = t.id
+          const nombre = t.nombre || 'Tarea sin nombre'
+          const porcentaje = parseFloat(t.porcentaje) || 0
+          
+          // Manejar notas que vienen como string del backend
+          let nota_actual = null
+          let simulada = cursoNotaMaxima.value / 2
+          
+          if (t.nota !== null && t.nota !== undefined && t.nota !== '') {
+            const notaParseada = parseFloat(String(t.nota).replace(',', '.'))
+            if (!isNaN(notaParseada)) {
+              nota_actual = notaParseada
+              simulada = notaParseada
+            }
+          }
+          
+          console.log(`Tarea ${index} procesada:`, {
+            id, nombre, porcentaje, nota_original: t.nota, nota_actual, simulada
+          })
+          
+          return {
+            id,
+            nombre,
+            porcentaje,
+            nota_actual,
+            simulada
+          }
+        } catch (error) {
+          console.error(`Error procesando tarea ${index}:`, error, t)
+          return {
+            id: t.id || index,
+            nombre: 'Error en tarea',
+            porcentaje: 0,
+            nota_actual: null,
+            simulada: cursoNotaMaxima.value / 2
+          }
+        }
+      })
+      
+      console.log('Simulador inicializado:', simulador.value)
       
       // Calcular promedio actual y simulado inicial
       actualizarPromedioActual()
       actualizarPromedio()
     } else {
+      console.warn('No hay tareas válidas en el perfil:', perfil.tareas)
       simulador.value = []
     }
 
